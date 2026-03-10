@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PMS Hotel Management API Documentation</title>
+  <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+    }
+    .swagger-ui .topbar {
+      display: none;
+    }
+    .info .title {
+      font-size: 2.5em !important;
+    }
+    .info .description {
+      font-size: 1.1em !important;
+      line-height: 1.6 !important;
+    }
+    .logo-container {
+      background: linear-gradient(135deg, #1a1a1a 0%, #333 100%);
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .logo-container h1 {
+      color: white;
+      margin: 0;
+      font-family: Georgia, serif;
+      font-weight: 300;
+      font-size: 2em;
+    }
+    .logo-container p {
+      color: rgba(255,255,255,0.7);
+      margin: 5px 0 0 0;
+      font-size: 0.9em;
+    }
+  </style>
+</head>
+<body>
+  <div class="logo-container">
+    <h1>PMS Hotel Management API</h1>
+    <p>Property Management System - REST API Documentation</p>
+  </div>
+  <div id="swagger-ui"></div>
+  <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js" charset="UTF-8"></script>
+  <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-standalone-preset.js" charset="UTF-8"></script>
+  <script>
+    window.onload = function() {
+      const ui = SwaggerUIBundle({
+        url: "./openapi.yaml",
+        dom_id: '#swagger-ui',
+        deepLinking: true,
+        presets: [
+          SwaggerUIBundle.presets.apis,
+          SwaggerUIStandalonePreset
+        ],
+        layout: "StandaloneLayout",
+        requestInterceptor: function(req) {
+          req.headers['Authorization'] = 'Bearer ' + localStorage.getItem('api_token');
+          return req;
+        },
+        responses: {
+          '200': {
+            'description': 'Successful operation',
+            'content': {
+              'application/json': {
+                'schema': {
+                  'type': 'object'
+                }
+              }
+            }
+          },
+          '401': {
+            'description': 'Unauthorized - Invalid or missing authentication token'
+          },
+          '403': {
+            'description': 'Forbidden - Insufficient permissions'
+          },
+          '404': {
+            'description': 'Resource not found'
+          },
+          '500': {
+            'description': 'Internal server error'
+          }
+        }
+      });
+      window.ui = ui;
+    };
+  </script>
+</body>
+</html>

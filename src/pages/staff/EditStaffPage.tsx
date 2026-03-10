@@ -1,0 +1,147 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { ChevronLeft, Save, X } from 'lucide-react';
+import { mockStaff } from '../../data/mockStaff';
+
+export default function EditStaffPage() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    department: '',
+    role: '',
+    status: 'active' as 'active' | 'on-leave' | 'inactive',
+    joinDate: '',
+  });
+
+  useEffect(() => {
+    const staff = mockStaff.find(s => s.id === id);
+    if (staff) {
+      setFormData({
+        name: staff.name,
+        email: staff.email,
+        phone: staff.phone,
+        department: staff.department,
+        role: staff.role,
+        status: staff.status,
+        joinDate: staff.joinDate,
+      });
+    }
+  }, [id]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    console.log('Updating staff:', formData);
+    navigate(`/staff/profile/${id}`);
+  };
+
+  return (
+    <div className="max-w-3xl mx-auto space-y-6">
+      <div className="flex items-center gap-4">
+        <button 
+          onClick={() => navigate(`/staff/profile/${id}`)}
+          className="p-2 hover:bg-[#1a1a1a]/5 rounded-lg transition-colors"
+        >
+          <ChevronLeft size={20} />
+        </button>
+        <div>
+          <h1 className="text-2xl font-serif font-medium text-[#1a1a1a]">Edit Staff Profile</h1>
+          <p className="text-sm text-[#1a1a1a]/60">Update information for {formData.name}</p>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm border border-[#1a1a1a]/5 overflow-hidden">
+        <div className="p-6 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#1a1a1a]/40">Full Name</label>
+              <input 
+                required
+                type="text" 
+                className="w-full px-4 py-2 bg-[#f8f9fa] border border-[#1a1a1a]/5 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1a1a1a]/20"
+                value={formData.name}
+                onChange={(e) => setFormData({...formData, name: e.target.value})}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#1a1a1a]/40">Email Address</label>
+              <input 
+                required
+                type="email" 
+                className="w-full px-4 py-2 bg-[#f8f9fa] border border-[#1a1a1a]/5 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1a1a1a]/20"
+                value={formData.email}
+                onChange={(e) => setFormData({...formData, email: e.target.value})}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#1a1a1a]/40">Phone Number</label>
+              <input 
+                required
+                type="tel" 
+                className="w-full px-4 py-2 bg-[#f8f9fa] border border-[#1a1a1a]/5 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1a1a1a]/20"
+                value={formData.phone}
+                onChange={(e) => setFormData({...formData, phone: e.target.value})}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#1a1a1a]/40">Status</label>
+              <select 
+                className="w-full px-4 py-2 bg-[#f8f9fa] border border-[#1a1a1a]/5 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1a1a1a]/20"
+                value={formData.status}
+                onChange={(e) => setFormData({...formData, status: e.target.value as any})}
+              >
+                <option value="active">Active</option>
+                <option value="on-leave">On Leave</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#1a1a1a]/40">Department</label>
+              <select 
+                className="w-full px-4 py-2 bg-[#f8f9fa] border border-[#1a1a1a]/5 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1a1a1a]/20"
+                value={formData.department}
+                onChange={(e) => setFormData({...formData, department: e.target.value})}
+              >
+                <option>Management</option>
+                <option>Front Office</option>
+                <option>Housekeeping</option>
+                <option>Maintenance</option>
+                <option>Food & Beverage</option>
+                <option>Security</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#1a1a1a]/40">Role</label>
+              <input 
+                required
+                type="text" 
+                className="w-full px-4 py-2 bg-[#f8f9fa] border border-[#1a1a1a]/5 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1a1a1a]/20"
+                value={formData.role}
+                onChange={(e) => setFormData({...formData, role: e.target.value})}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6 bg-[#f8f9fa] border-t border-[#1a1a1a]/5 flex justify-end gap-3">
+          <button 
+            type="button"
+            onClick={() => navigate(`/staff/profile/${id}`)}
+            className="px-6 py-2 rounded-lg border border-[#1a1a1a]/10 text-sm font-medium hover:bg-white transition-colors"
+          >
+            Cancel
+          </button>
+          <button 
+            type="submit"
+            className="px-6 py-2 rounded-lg bg-[#1a1a1a] text-white text-sm font-medium hover:bg-[#333] transition-colors flex items-center gap-2"
+          >
+            <Save size={18} />
+            <span>Save Changes</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}

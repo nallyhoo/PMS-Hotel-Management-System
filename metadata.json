@@ -1,0 +1,5 @@
+{
+  "name": "PMS",
+  "description": "A professional-grade Hotel Property Management System featuring comprehensive authentication, reservation, and property management tools.",
+  "requestFramePermissions": []
+}
