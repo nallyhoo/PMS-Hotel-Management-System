@@ -121,7 +121,7 @@ export default function ServiceCategoryPage() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="flex items-center gap-2">
                 <button className="p-2 hover:bg-[#1a1a1a]/5 rounded-lg transition-colors text-[#1a1a1a]/60">
                   <Edit2 size={16} />
                 </button>

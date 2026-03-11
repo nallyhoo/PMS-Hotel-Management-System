@@ -102,7 +102,7 @@ export default function BookingTimelinePage() {
                       <p className="text-sm font-medium">Room {room.id}</p>
                       <p className="text-[10px] text-[#1a1a1a]/40 uppercase tracking-widest">{room.type}</p>
                     </div>
-                    <button className="p-1 hover:bg-[#1a1a1a]/5 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button className="p-1 hover:bg-[#1a1a1a]/5 rounded">
                       <MoreVertical size={14} className="text-[#1a1a1a]/40" />
                     </button>
                   </div>

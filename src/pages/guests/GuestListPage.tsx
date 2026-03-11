@@ -16,6 +16,7 @@ import {
 import { useGuests } from '../../api/hooks';
 import { useNavigate } from 'react-router-dom';
 import type { Guest } from '../../types/database';
+import Pagination from '../../components/Pagination';
 
 interface GuestUI {
   id: string;
@@ -31,6 +32,8 @@ interface GuestUI {
 export default function GuestListPage() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   
   const { data, isLoading, error, refetch } = useGuests({ limit: 50 });
 
@@ -53,6 +56,15 @@ export default function GuestListPage() {
     guest.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
     guest.id.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const totalPages = pageSize === 999999 ? 1 : Math.ceil(filteredGuests.length / pageSize);
+  const paginatedGuests = pageSize === 999999 
+    ? filteredGuests 
+    : filteredGuests.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
 
   const getTierColor = (tier: string) => {
     switch (tier) {
@@ -126,6 +138,23 @@ export default function GuestListPage() {
           <button className="flex items-center gap-2 px-4 py-2 border border-[#1a1a1a]/10 rounded-xl text-xs font-medium text-[#1a1a1a]/60 hover:bg-[#f8f9fa]">
             Status
           </button>
+          <div className="flex items-center gap-2 px-3 py-2 bg-[#f8f9fa] border border-[#1a1a1a]/5 rounded-xl">
+            <span className="text-xs text-[#1a1a1a]/60">Show</span>
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+              className="bg-transparent border-none focus:outline-none text-xs font-medium"
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+              <option value={999999}>All</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -145,7 +174,7 @@ export default function GuestListPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1a1a1a]/5">
-              {filteredGuests.map((guest) => (
+              {paginatedGuests.map((guest) => (
                 <tr 
                   key={guest.id} 
                   className="hover:bg-[#f8f9fa] transition-colors cursor-pointer group"
@@ -188,7 +217,7 @@ export default function GuestListPage() {
                     <span className="text-xs font-medium">{guest.status}</span>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button className="p-2 hover:bg-[#1a1a1a]/5 rounded-lg transition-colors text-[#1a1a1a]/40 group-hover:text-[#1a1a1a]">
+                    <button className="p-2 hover:bg-[#1a1a1a]/5 rounded-lg transition-colors text-[#1a1a1a]">
                       <ChevronRight size={18} />
                     </button>
                   </td>
@@ -197,13 +226,14 @@ export default function GuestListPage() {
             </tbody>
           </table>
         </div>
-        <div className="p-4 bg-[#f8f9fa] border-t border-[#1a1a1a]/5 flex items-center justify-between">
-          <p className="text-xs text-[#1a1a1a]/40">Showing 5 of 1,240 guests</p>
-          <div className="flex items-center gap-2">
-            <button className="px-3 py-1 border border-[#1a1a1a]/10 rounded text-[10px] uppercase font-bold tracking-widest disabled:opacity-50" disabled>Prev</button>
-            <button className="px-3 py-1 border border-[#1a1a1a]/10 rounded text-[10px] uppercase font-bold tracking-widest">Next</button>
-          </div>
-        </div>
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          total={filteredGuests.length}
+          pageSize={pageSize}
+          onPageChange={handlePageChange}
+          showPageSize={false}
+        />
       </div>
     </div>
   );

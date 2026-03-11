@@ -230,7 +230,7 @@ export default function ServiceUsageReportPage() {
                     </div>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button className="p-2 hover:bg-[#1a1a1a]/5 rounded-lg transition-colors text-[#1a1a1a]/60 opacity-0 group-hover:opacity-100">
+                    <button className="p-2 hover:bg-[#1a1a1a]/5 rounded-lg transition-colors text-[#1a1a1a]/60">
                       <MoreHorizontal size={16} />
                     </button>
                   </td>

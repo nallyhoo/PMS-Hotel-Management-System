@@ -29,8 +29,30 @@ router.get('/', (req: Request, res: Response) => {
     query += ' ORDER BY GuestID DESC LIMIT ? OFFSET ?';
     const guests = db.prepare(query).all(...params, Number(limit), offset);
 
+    const transformedGuests = guests.map((guest: any) => ({
+      guestId: guest.GuestID,
+      firstName: guest.FirstName,
+      lastName: guest.LastName,
+      email: guest.Email,
+      phone: guest.Phone,
+      alternatePhone: guest.AlternatePhone,
+      nationality: guest.Nationality,
+      dateOfBirth: guest.DateOfBirth,
+      gender: guest.Gender,
+      address: guest.Address,
+      city: guest.City,
+      country: guest.Country,
+      postalCode: guest.PostalCode,
+      vipStatus: guest.VIPStatus,
+      blacklistReason: guest.BlacklistReason,
+      marketingConsent: guest.MarketingConsent === 1,
+      notes: guest.Notes,
+      createdDate: guest.CreatedDate,
+      updatedDate: guest.UpdatedDate
+    }));
+
     res.json({
-      data: guests,
+      data: transformedGuests,
       total,
       page: Number(page),
       limit: Number(limit),

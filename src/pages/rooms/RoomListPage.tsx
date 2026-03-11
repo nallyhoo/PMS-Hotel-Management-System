@@ -3,8 +3,6 @@ import {
   Search, 
   Filter, 
   Plus, 
-  ChevronLeft, 
-  ChevronRight,
   Eye,
   Edit2,
   DoorOpen,
@@ -15,6 +13,7 @@ import {
 import { useRooms } from '../../api/hooks';
 import type { RoomStatus } from '../../types/database';
 import { useNavigate } from 'react-router-dom';
+import Pagination from '../../components/Pagination';
 
 interface RoomUI {
   id: string;
@@ -30,6 +29,8 @@ export default function RoomListPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [typeFilter, setTypeFilter] = useState<string>('All');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const navigate = useNavigate();
   
   const { data: rooms, isLoading, error, refetch } = useRooms();
@@ -48,22 +49,22 @@ export default function RoomListPage() {
   }, [rooms]);
 
   const filteredRooms = roomsUI.filter(room => {
-    const matchesSearch = room.roomNumber.includes(searchTerm) || 
-                         room.type.toLowerCase().includes(searchTerm.toLowerCase());
+    const roomNum = room.roomNumber || '';
+    const roomType = room.type || '';
+    const matchesSearch = roomNum.includes(searchTerm) || 
+                         roomType.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'All' || room.status === statusFilter;
     const matchesType = typeFilter === 'All' || room.type === typeFilter;
     return matchesSearch && matchesStatus && matchesType;
   });
 
-  const getStatusStyles = (status: RoomStatus) => {
-    switch (status) {
-      case 'Available': return 'bg-emerald-50 text-emerald-600 border-emerald-100';
-      case 'Occupied': return 'bg-blue-50 text-blue-600 border-blue-100';
-      case 'Dirty': return 'bg-amber-50 text-amber-600 border-amber-100';
-      case 'Maintenance': return 'bg-red-50 text-red-600 border-red-100';
-      case 'Reserved': return 'bg-purple-50 text-purple-600 border-purple-100';
-      default: return 'bg-gray-50 text-gray-600 border-gray-100';
-    }
+  const totalPages = pageSize === 999999 ? 1 : Math.ceil(filteredRooms.length / pageSize);
+  const paginatedRooms = pageSize === 999999 
+    ? filteredRooms 
+    : filteredRooms.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
   };
 
   if (error) {
@@ -81,6 +82,17 @@ export default function RoomListPage() {
       </div>
     );
   }
+
+  const getStatusStyles = (status: RoomStatus) => {
+    switch (status) {
+      case 'Available': return 'bg-emerald-50 text-emerald-600 border-emerald-100';
+      case 'Occupied': return 'bg-blue-50 text-blue-600 border-blue-100';
+      case 'Dirty': return 'bg-amber-50 text-amber-600 border-amber-100';
+      case 'Maintenance': return 'bg-red-50 text-red-600 border-red-100';
+      case 'Reserved': return 'bg-purple-50 text-purple-600 border-purple-100';
+      default: return 'bg-gray-50 text-gray-600 border-gray-100';
+    }
+  };
 
   if (isLoading) {
     return (
@@ -150,6 +162,23 @@ export default function RoomListPage() {
               <option value="Penthouse">Penthouse</option>
             </select>
           </div>
+          <div className="flex items-center gap-2 px-3 py-2 bg-[#f8f9fa] border border-[#1a1a1a]/5 rounded-xl">
+            <span className="text-xs text-[#1a1a1a]/60">Show</span>
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+              className="bg-transparent border-none focus:outline-none text-xs font-medium"
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+              <option value={999999}>All</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -169,7 +198,7 @@ export default function RoomListPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1a1a1a]/5">
-              {filteredRooms.map((room) => (
+              {paginatedRooms.map((room) => (
                 <tr key={room.id} className="hover:bg-[#f8f9fa] transition-colors group">
                   <td className="px-6 py-4">
                     <span className="text-sm font-medium">Room {room.roomNumber}</span>
@@ -195,7 +224,7 @@ export default function RoomListPage() {
                     </div>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center justify-end gap-2">
                       <button 
                         onClick={() => navigate(`/rooms/details/${room.id}`)}
                         className="p-2 hover:bg-[#1a1a1a]/5 rounded-lg transition-colors text-[#1a1a1a]/60" 
@@ -216,6 +245,14 @@ export default function RoomListPage() {
             </tbody>
           </table>
         </div>
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          total={filteredRooms.length}
+          pageSize={pageSize}
+          onPageChange={handlePageChange}
+          showPageSize={false}
+        />
       </div>
     </div>
   );

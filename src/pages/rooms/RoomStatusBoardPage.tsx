@@ -90,7 +90,7 @@ export default function RoomStatusBoardPage() {
                 <p className="text-[10px] text-[#1a1a1a]/60">{room.floor}</p>
               </div>
             </div>
-            <div className="px-4 py-2 bg-[#f8f9fa] border-t border-[#1a1a1a]/5 flex justify-between items-center opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="px-4 py-2 bg-[#f8f9fa] border-t border-[#1a1a1a]/5 flex justify-between items-center">
               <span className="text-[9px] uppercase tracking-widest font-bold text-[#1a1a1a]/40">View Details</span>
               <RefreshCw size={10} className="text-[#1a1a1a]/40" />
             </div>

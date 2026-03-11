@@ -211,6 +211,11 @@ export interface Reservation {
   createdBy: number;
   createdDate: string;
   updatedDate: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+  roomTypeName?: string;
 }
 
 export type ReservationStatus = 'Pending' | 'Confirmed' | 'Checked In' | 'Checked Out' | 'Cancelled' | 'No Show';

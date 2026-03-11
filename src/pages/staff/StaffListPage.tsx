@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useEmployees } from '../../api/hooks';
 import type { Employee } from '../../types/database';
+import Pagination from '../../components/Pagination';
 
 interface StaffUI {
   id: string;
@@ -32,6 +33,8 @@ export default function StaffListPage() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [deptFilter, setDeptFilter] = useState('All');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   
   const { data: employees, isLoading, error, refetch } = useEmployees();
 
@@ -57,6 +60,15 @@ export default function StaffListPage() {
     const matchesDept = deptFilter === 'All' || staff.department === deptFilter;
     return matchesSearch && matchesDept;
   });
+
+  const totalPages = pageSize === 999999 ? 1 : Math.ceil(filteredStaff.length / pageSize);
+  const paginatedStaff = pageSize === 999999 
+    ? filteredStaff 
+    : filteredStaff.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
 
   if (error) {
     return (
@@ -120,6 +132,23 @@ export default function StaffListPage() {
                 <option key={dept} value={dept}>{dept}</option>
               ))}
             </select>
+            <div className="flex items-center gap-2 px-3 py-2 bg-[#f8f9fa] border border-[#1a1a1a]/5 rounded-lg">
+              <span className="text-xs text-[#1a1a1a]/60">Show</span>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="bg-transparent border-none focus:outline-none text-xs font-medium"
+              >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+                <option value={999999}>All</option>
+              </select>
+            </div>
             <button className="p-2 bg-[#f8f9fa] border border-[#1a1a1a]/5 rounded-lg text-[#1a1a1a]/60 hover:text-[#1a1a1a]">
               <Filter size={18} />
             </button>
@@ -139,7 +168,7 @@ export default function StaffListPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1a1a1a]/5">
-              {filteredStaff.map((staff) => (
+              {paginatedStaff.map((staff) => (
                 <tr key={staff.id} className="hover:bg-[#f8f9fa] transition-colors group">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -185,7 +214,7 @@ export default function StaffListPage() {
                     {staff.joinDate}
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center justify-end gap-2">
                       <button 
                         onClick={() => navigate(`/staff/profile/${staff.id}`)}
                         className="p-1.5 hover:bg-[#1a1a1a]/5 rounded text-[#1a1a1a]/60 hover:text-[#1a1a1a]"
@@ -220,6 +249,14 @@ export default function StaffListPage() {
             <p className="text-[#1a1a1a]/40 italic">No staff members found matching your criteria.</p>
           </div>
         )}
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          total={filteredStaff.length}
+          pageSize={pageSize}
+          onPageChange={handlePageChange}
+          showPageSize={false}
+        />
       </div>
     </div>
   );

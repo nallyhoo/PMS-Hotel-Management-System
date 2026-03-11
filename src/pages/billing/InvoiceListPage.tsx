@@ -139,7 +139,7 @@ export default function InvoiceListPage() {
                   <td className="px-6 py-4 text-sm text-[#1a1a1a]/60">{invoice.date}</td>
                   <td className="px-6 py-4 text-sm text-[#1a1a1a]/60">{invoice.dueDate}</td>
                   <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center justify-end gap-2">
                       <button 
                         onClick={(e) => { e.stopPropagation(); navigate(`/billing/details/${invoice.id}`); }}
                         className="p-2 hover:bg-[#1a1a1a]/5 rounded-lg transition-colors text-[#1a1a1a]/60"

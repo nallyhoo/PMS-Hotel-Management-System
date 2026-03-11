@@ -119,7 +119,7 @@ export default function CleaningStatusBoard() {
                 >
                   <div className="flex justify-between items-start mb-4">
                     <span className="text-lg font-serif">Room {room.id}</span>
-                    <button className="p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button className="p-1">
                       <MoreVertical size={14} />
                     </button>
                   </div>

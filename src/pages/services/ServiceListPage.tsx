@@ -149,7 +149,7 @@ export default function ServiceListPage() {
                     <span className="text-sm font-medium text-[#1a1a1a]">{service.usage}</span>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center justify-end gap-2">
                       <button 
                         onClick={(e) => { e.stopPropagation(); navigate(`/services/edit/${service.id}`); }}
                         className="p-2 hover:bg-[#1a1a1a]/5 rounded-lg transition-colors text-[#1a1a1a]/60"

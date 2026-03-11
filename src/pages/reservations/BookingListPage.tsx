@@ -4,8 +4,6 @@ import {
   Filter, 
   Download, 
   Plus, 
-  ChevronLeft, 
-  ChevronRight,
   Eye,
   Edit2,
   XCircle,
@@ -14,6 +12,7 @@ import {
 import { useReservations } from '../../api/hooks';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
+import Pagination from '../../components/Pagination';
 
 interface ReservationUI {
   id: string;
@@ -31,6 +30,8 @@ interface ReservationUI {
 export default function BookingListPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('All');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const navigate = useNavigate();
   
   const { data, isLoading, error, refetch } = useReservations({ limit: 50 });
@@ -39,8 +40,8 @@ export default function BookingListPage() {
     if (!data?.data) return [];
     return data.data.map((res) => ({
       id: res.reservationCode || String(res.reservationId),
-      guestName: `Guest ${res.guestId}`,
-      roomType: 'Standard',
+      guestName: res.firstName && res.lastName ? `${res.firstName} ${res.lastName}` : `Guest ${res.guestId}`,
+      roomType: res.roomTypeName || 'Standard',
       roomNumber: res.assignedRoomId ? String(res.assignedRoomId) : undefined,
       checkIn: res.checkInDate,
       checkOut: res.checkOutDate,
@@ -57,6 +58,15 @@ export default function BookingListPage() {
     const matchesStatus = statusFilter === 'All' || res.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  const totalPages = pageSize === 999999 ? 1 : Math.ceil(filteredReservations.length / pageSize);
+  const paginatedReservations = pageSize === 999999 
+    ? filteredReservations 
+    : filteredReservations.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
 
   const getStatusStyles = (status: ReservationUI['status']) => {
     switch (status) {
@@ -135,6 +145,23 @@ export default function BookingListPage() {
               <option value="Pending">Pending</option>
             </select>
           </div>
+          <div className="flex items-center gap-2 px-3 py-2 bg-[#f8f9fa] border border-[#1a1a1a]/5 rounded-xl">
+            <span className="text-xs text-[#1a1a1a]/60">Show</span>
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+              className="bg-transparent border-none focus:outline-none text-xs font-medium"
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+              <option value={999999}>All</option>
+            </select>
+          </div>
           <button className="px-4 py-2 bg-[#f8f9fa] border border-[#1a1a1a]/5 rounded-xl text-xs font-medium hover:bg-[#1a1a1a]/5 transition-colors">
             Clear
           </button>
@@ -158,7 +185,7 @@ export default function BookingListPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1a1a1a]/5">
-              {filteredReservations.map((res) => (
+              {paginatedReservations.map((res) => (
                 <tr key={res.id} className="hover:bg-[#f8f9fa] transition-colors group">
                   <td className="px-6 py-4">
                     <span className="text-xs font-mono font-medium text-[#1a1a1a]/60">{res.id}</span>
@@ -197,7 +224,7 @@ export default function BookingListPage() {
                     <span className="text-[10px] uppercase tracking-widest font-semibold text-[#1a1a1a]/40">{res.source}</span>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center justify-end gap-2">
                       <button 
                         onClick={() => navigate(`/reservations/details/${res.id}`)}
                         className="p-2 hover:bg-[#1a1a1a]/5 rounded-lg transition-colors text-[#1a1a1a]/60" 
@@ -220,23 +247,14 @@ export default function BookingListPage() {
         </div>
 
         {/* Pagination */}
-        <div className="p-6 border-t border-[#1a1a1a]/5 flex items-center justify-between">
-          <p className="text-xs text-[#1a1a1a]/40 font-light">
-            Showing <span className="font-medium text-[#1a1a1a]">1 to {filteredReservations.length}</span> of <span className="font-medium text-[#1a1a1a]">{data?.total || filteredReservations.length}</span> results
-          </p>
-          <div className="flex items-center gap-2">
-            <button className="p-2 border border-[#1a1a1a]/10 rounded-lg hover:bg-[#f8f9fa] disabled:opacity-50" disabled={!data?.total || data.page <= 1}>
-              <ChevronLeft size={16} />
-            </button>
-            <div className="flex gap-1">
-              <button className="w-8 h-8 flex items-center justify-center bg-[#1a1a1a] text-white rounded-lg text-xs font-medium">1</button>
-              <button className="w-8 h-8 flex items-center justify-center hover:bg-[#f8f9fa] rounded-lg text-xs font-medium">2</button>
-            </div>
-            <button className="p-2 border border-[#1a1a1a]/10 rounded-lg hover:bg-[#f8f9fa]">
-              <ChevronRight size={16} />
-            </button>
-          </div>
-        </div>
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          total={filteredReservations.length}
+          pageSize={pageSize}
+          onPageChange={handlePageChange}
+          showPageSize={false}
+        />
       </div>
     </div>
   );

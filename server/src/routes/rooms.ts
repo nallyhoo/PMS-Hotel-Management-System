@@ -37,7 +37,23 @@ router.get('/', (req: Request, res: Response) => {
     query += ' ORDER BY r.RoomNumber';
     
     const rooms = db.prepare(query).all(...params);
-    res.json(rooms);
+    const transformedRooms = rooms.map((room: any) => ({
+      roomId: room.RoomID,
+      branchId: room.BranchID,
+      roomNumber: room.RoomNumber,
+      roomTypeId: room.RoomTypeID,
+      floorId: room.FloorID,
+      status: room.Status,
+      currentReservationId: room.CurrentReservationID,
+      cleaningStatus: room.CleaningStatus,
+      notes: room.Notes,
+      lastCleaned: room.LastCleaned,
+      createdDate: room.CreatedDate,
+      updatedDate: room.UpdatedDate,
+      roomTypeName: room.RoomTypeName,
+      floorNumber: room.FloorNumber
+    }));
+    res.json(transformedRooms);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch rooms' });
   }

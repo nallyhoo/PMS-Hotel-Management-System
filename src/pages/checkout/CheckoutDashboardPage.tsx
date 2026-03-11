@@ -94,7 +94,7 @@ export default function CheckoutDashboardPage() {
                     </div>
                     <button 
                       onClick={() => navigate(`/checkout/process/${res.id}`)}
-                      className="px-4 py-2 bg-[#1a1a1a] text-white rounded-lg text-[10px] uppercase tracking-widest font-bold hover:bg-[#333] transition-colors opacity-0 group-hover:opacity-100"
+                      className="px-4 py-2 bg-[#1a1a1a] text-white rounded-lg text-[10px] uppercase tracking-widest font-bold hover:bg-[#333] transition-colors"
                     >
                       Process Check-out
                     </button>

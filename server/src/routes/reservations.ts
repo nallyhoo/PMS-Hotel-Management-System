@@ -45,8 +45,33 @@ router.get('/', (req: Request, res: Response) => {
     query += ' ORDER BY r.CheckInDate DESC LIMIT ? OFFSET ?';
     const reservations = db.prepare(query).all(...params, Number(limit), offset);
 
+    const transformedReservations = reservations.map((res: any) => ({
+      reservationId: res.ReservationID,
+      guestId: res.GuestID,
+      branchId: res.BranchID,
+      reservationCode: res.ReservationCode,
+      checkInDate: res.CheckInDate,
+      checkOutDate: res.CheckOutDate,
+      status: res.Status,
+      bookingSource: res.BookingSource,
+      adults: res.Adults,
+      children: res.Children,
+      specialRequests: res.SpecialRequests,
+      totalAmount: res.TotalAmount,
+      depositAmount: res.DepositAmount,
+      depositPaid: res.DepositPaid === 1,
+      assignedRoomId: res.AssignedRoomID,
+      confirmationDate: res.ConfirmationDate,
+      createdDate: res.CreatedDate,
+      firstName: res.FirstName,
+      lastName: res.LastName,
+      email: res.Email,
+      phone: res.Phone,
+      roomTypeName: res.RoomTypeName
+    }));
+
     res.json({
-      data: reservations,
+      data: transformedReservations,
       total,
       page: Number(page),
       limit: Number(limit),

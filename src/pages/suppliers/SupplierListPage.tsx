@@ -126,7 +126,7 @@ export default function SupplierListPage() {
                     {supplier.lastOrderDate}
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center justify-end gap-2">
                       <button 
                         onClick={() => navigate(`/suppliers/details/${supplier.id}`)}
                         className="p-1.5 hover:bg-[#1a1a1a]/5 rounded text-[#1a1a1a]/60 hover:text-[#1a1a1a]"
