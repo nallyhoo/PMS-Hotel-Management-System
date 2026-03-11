@@ -11,12 +11,18 @@ import {
   Info
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { mockRoomTypes } from '../../data/mockRoomTypes';
+import { useQuery } from '@tanstack/react-query';
+import roomService from '../../api/rooms';
 
 export default function RoomTypePricingPage() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const roomType = mockRoomTypes.find(rt => rt.id === id) || mockRoomTypes[0];
+
+  const { data: roomType, isLoading } = useQuery({
+    queryKey: ['roomType', id],
+    queryFn: () => roomService.getRoomType(Number(id)),
+    enabled: !!id,
+  });
 
   const pricingRules = [
     { id: 'PR-001', name: 'Weekend Surcharge', type: 'Percentage', value: 15, period: 'Fri-Sun', status: 'Active' },
@@ -24,6 +30,28 @@ export default function RoomTypePricingPage() {
     { id: 'PR-003', name: 'Early Bird Discount', type: 'Percentage', value: -10, period: '30+ days in advance', status: 'Active' },
     { id: 'PR-004', name: 'Last Minute Deal', type: 'Percentage', value: -20, period: 'Within 24 hours', status: 'Inactive' },
   ];
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1a1a1a]"></div>
+      </div>
+    );
+  }
+
+  if (!roomType) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px]">
+        <p className="text-gray-500">Room type not found</p>
+        <button 
+          onClick={() => navigate('/rooms/types')}
+          className="mt-4 px-4 py-2 bg-[#1a1a1a] text-white rounded-lg"
+        >
+          Back to Room Types
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-6xl mx-auto space-y-8">
@@ -38,7 +66,7 @@ export default function RoomTypePricingPage() {
           </button>
           <div>
             <h1 className="text-3xl font-serif font-light mb-1">Pricing Strategy</h1>
-            <p className="text-sm text-[#1a1a1a]/60 font-light">{roomType.name} • Base Price: ${roomType.basePrice}</p>
+            <p className="text-sm text-[#1a1a1a]/60 font-light">{roomType.typeName} • Base Price: ${roomType.basePrice}</p>
           </div>
         </div>
         <div className="flex items-center gap-3">

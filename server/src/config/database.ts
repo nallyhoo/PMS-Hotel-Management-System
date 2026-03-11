@@ -35,10 +35,50 @@ export function initDatabase() {
 }
 
 export function seedDatabase() {
-  const guestCount = db.prepare('SELECT COUNT(*) as count FROM Guests').get() as { count: number };
-  if (guestCount.count > 0) {
+  // Check if already seeded
+  const roomTypeCount = db.prepare('SELECT COUNT(*) as count FROM RoomTypes').get() as { count: number };
+  if (roomTypeCount.count > 0) {
     console.log('Database already seeded');
     return;
+  }
+
+  // Insert floors first
+  const insertFloor = db.prepare(`
+    INSERT INTO Floors (BranchID, FloorNumber, FloorName, Description)
+    VALUES (?, ?, ?, ?)
+  `);
+
+  const floors = [
+    [1, 1, 'Ground Floor', 'Ground floor rooms'],
+    [1, 2, 'Second Floor', 'Second floor rooms'],
+    [1, 3, 'Third Floor', 'Third floor rooms'],
+    [1, 4, 'Fourth Floor', 'Fourth floor rooms'],
+  ];
+
+  for (const f of floors) {
+    insertFloor.run(...f);
+  }
+
+  const insertRoomType = db.prepare(`
+    INSERT INTO RoomTypes (TypeName, Description, Capacity, BasePrice, MaxOccupancy, BedType, SizeSqFt, IsActive)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  const roomTypes = [
+    ['Standard', 'Comfortable room with essential amenities', 2, 99, 2, 'Queen', 300, 1],
+    ['Superior', 'Upgraded room with enhanced comfort', 2, 149, 2, 'King', 350, 1],
+    ['Deluxe', 'Spacious room with premium amenities', 2, 199, 3, 'King', 400, 1],
+    ['Executive', 'Premium room for business travelers', 2, 249, 3, 'King', 450, 1],
+    ['Club', 'Exclusive room with club lounge access', 2, 299, 3, 'King', 500, 1],
+    ['Junior Suite', 'Open-plan suite with living area', 3, 349, 4, 'King', 550, 1],
+    ['Business Suite', 'Spacious suite with workspace', 3, 449, 4, 'King', 650, 1],
+    ['Family Suite', 'Large suite for families', 4, 549, 6, 'King+Queen', 800, 1],
+    ['Presidential Suite', 'Ultimate luxury suite', 4, 999, 6, 'King', 1500, 1],
+    ['Accessible Room', 'Room with accessibility features', 2, 129, 2, 'Queen', 350, 1],
+  ];
+
+  for (const rt of roomTypes) {
+    insertRoomType.run(...rt);
   }
 
   const insertGuest = db.prepare(`
@@ -78,6 +118,44 @@ export function seedDatabase() {
 
   for (const res of reservations) {
     insertReservation.run(...res);
+  }
+
+  // Get room type IDs dynamically
+  const roomTypeRows = db.prepare('SELECT RoomTypeID, TypeName FROM RoomTypes').all() as any[];
+  const roomTypeMap = new Map(roomTypeRows.map(rt => [rt.TypeName, rt.RoomTypeID]));
+  
+  // Get floor IDs dynamically
+  const floorRows = db.prepare('SELECT FloorID, FloorNumber FROM Floors').all() as any[];
+  const floorMap = new Map(floorRows.map(f => [f.FloorNumber, f.FloorID]));
+
+  // Insert rooms using dynamic IDs
+  const insertRoom = db.prepare(`
+    INSERT INTO Rooms (BranchID, RoomNumber, RoomTypeID, FloorID, Status, CleaningStatus, Notes)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  const rooms = [
+    [1, '101', roomTypeMap.get('Standard'), floorMap.get(1), 'Available', 'Clean', null],
+    [1, '102', roomTypeMap.get('Standard'), floorMap.get(1), 'Occupied', 'Clean', null],
+    [1, '103', roomTypeMap.get('Superior'), floorMap.get(1), 'Available', 'Clean', null],
+    [1, '104', roomTypeMap.get('Superior'), floorMap.get(1), 'Reserved', 'Clean', null],
+    [1, '105', roomTypeMap.get('Deluxe'), floorMap.get(1), 'Dirty', 'Dirty', null],
+    [1, '201', roomTypeMap.get('Deluxe'), floorMap.get(2), 'Available', 'Clean', null],
+    [1, '202', roomTypeMap.get('Executive'), floorMap.get(2), 'Occupied', 'Clean', null],
+    [1, '203', roomTypeMap.get('Executive'), floorMap.get(2), 'Maintenance', 'Inspected', 'HVAC repair'],
+    [1, '204', roomTypeMap.get('Club'), floorMap.get(2), 'Available', 'Clean', null],
+    [1, '205', roomTypeMap.get('Club'), floorMap.get(2), 'Occupied', 'Clean', null],
+    [1, '301', roomTypeMap.get('Junior Suite'), floorMap.get(3), 'Available', 'Clean', null],
+    [1, '302', roomTypeMap.get('Junior Suite'), floorMap.get(3), 'Reserved', 'Clean', null],
+    [1, '303', roomTypeMap.get('Business Suite'), floorMap.get(3), 'Available', 'Clean', null],
+    [1, '304', roomTypeMap.get('Business Suite'), floorMap.get(3), 'Occupied', 'Clean', null],
+    [1, '305', roomTypeMap.get('Family Suite'), floorMap.get(3), 'Available', 'Clean', null],
+    [1, '401', roomTypeMap.get('Presidential Suite'), floorMap.get(4), 'Available', 'Clean', null],
+    [1, '402', roomTypeMap.get('Accessible Room'), floorMap.get(4), 'Available', 'Clean', 'Wheelchair accessible'],
+  ];
+
+  for (const room of rooms) {
+    insertRoom.run(...room);
   }
 
   console.log('Database seeded with sample data');

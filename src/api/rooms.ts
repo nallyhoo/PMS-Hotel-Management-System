@@ -14,6 +14,7 @@ export interface CreateRoomRequest {
   roomTypeId: number;
   floorId: number;
   status?: string;
+  cleaningStatus?: string;
   notes?: string;
 }
 
@@ -114,6 +115,34 @@ class RoomService {
 
   async getStatusBoard(): Promise<RoomStatusBoard[]> {
     return api.get<RoomStatusBoard[]>('/rooms/status-board');
+  }
+
+  async getRoomTypeImages(roomTypeId: number): Promise<any[]> {
+    return api.get<any[]>(`/rooms/types/${roomTypeId}/images`);
+  }
+
+  async addRoomTypeImage(roomTypeId: number, data: { imageUrl: string; isPrimary?: boolean; sortOrder?: number }): Promise<{ imageId: number }> {
+    return api.post<{ imageId: number }>(`/rooms/types/${roomTypeId}/images`, data);
+  }
+
+  async deleteRoomTypeImage(imageId: number): Promise<void> {
+    return api.delete<void>(`/rooms/images/${imageId}`);
+  }
+
+  async getFloors(): Promise<any[]> {
+    return api.get<any[]>('/rooms/floors/list');
+  }
+
+  async createFloor(data: { floorNumber: number; floorName: string; description?: string }): Promise<{ floorId: number }> {
+    return api.post<{ floorId: number }>('/rooms/floors', data);
+  }
+
+  async updateFloor(id: number, data: { floorNumber: number; floorName: string; description?: string }): Promise<void> {
+    return api.put<void>(`/rooms/floors/${id}`, data);
+  }
+
+  async deleteFloor(id: number): Promise<void> {
+    return api.delete<void>(`/rooms/floors/${id}`);
   }
 }
 

@@ -29,6 +29,13 @@ export function useRooms(params?: GetRoomsParams) {
   });
 }
 
+export function useRoomTypes() {
+  return useQuery({
+    queryKey: ['roomTypes'],
+    queryFn: () => roomService.getRoomTypes(),
+  });
+}
+
 export function useRoom(id: number | string) {
   return useQuery({
     queryKey: ['room', id],

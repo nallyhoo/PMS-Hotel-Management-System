@@ -44,17 +44,18 @@ export interface GetMaintenanceHistoryParams {
 }
 
 class MaintenanceService {
-  async getRequests(params?: GetMaintenanceRequestsParams): Promise<MaintenanceRequest[]> {
+  async getRequests(params?: GetMaintenanceRequestsParams): Promise<any[]> {
     const queryParams = new URLSearchParams();
     if (params?.status) queryParams.append('status', params.status);
     if (params?.priority) queryParams.append('priority', params.priority);
     if (params?.roomId) queryParams.append('roomId', String(params.roomId));
     
-    return api.get<MaintenanceRequest[]>(`/maintenance/requests?${queryParams}`);
+    const query = queryParams.toString();
+    return api.get<any[]>(`/maintenance/requests${query ? `?${query}` : ''}`);
   }
 
-  async getRequest(id: number): Promise<MaintenanceRequest> {
-    return api.get<MaintenanceRequest>(`/maintenance/requests/${id}`);
+  async getRequest(id: number): Promise<any> {
+    return api.get<any>(`/maintenance/requests/${id}`);
   }
 
   async createRequest(data: CreateMaintenanceRequestRequest): Promise<{ requestId: number }> {
@@ -73,13 +74,14 @@ class MaintenanceService {
     return api.put<void>(`/maintenance/tasks/${id}`, data);
   }
 
-  async getHistory(params?: GetMaintenanceHistoryParams): Promise<MaintenanceHistory[]> {
+  async getHistory(params?: GetMaintenanceHistoryParams): Promise<any[]> {
     const queryParams = new URLSearchParams();
     if (params?.roomId) queryParams.append('roomId', String(params.roomId));
     if (params?.startDate) queryParams.append('startDate', params.startDate);
     if (params?.endDate) queryParams.append('endDate', params.endDate);
     
-    return api.get<MaintenanceHistory[]>(`/maintenance/history?${queryParams}`);
+    const query = queryParams.toString();
+    return api.get<any[]>(`/maintenance/history${query ? `?${query}` : ''}`);
   }
 }
 

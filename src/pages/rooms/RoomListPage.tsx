@@ -10,7 +10,7 @@ import {
   Wrench,
   AlertCircle
 } from 'lucide-react';
-import { useRooms } from '../../api/hooks';
+import { useRooms, useRoomTypes } from '../../api/hooks';
 import type { RoomStatus } from '../../types/database';
 import { useNavigate } from 'react-router-dom';
 import Pagination from '../../components/Pagination';
@@ -19,7 +19,9 @@ interface RoomUI {
   id: string;
   roomNumber: string;
   type: string;
+  typeId: number;
   floor: string;
+  floorId: number;
   status: RoomStatus;
   price: number;
   lastCleaned: string;
@@ -34,19 +36,25 @@ export default function RoomListPage() {
   const navigate = useNavigate();
   
   const { data: rooms, isLoading, error, refetch } = useRooms();
+  const { data: roomTypes } = useRoomTypes();
 
   const roomsUI: RoomUI[] = useMemo(() => {
     if (!rooms) return [];
-    return rooms.map(room => ({
-      id: String(room.roomId),
-      roomNumber: room.roomNumber,
-      type: `Type ${room.roomTypeId}`,
-      floor: `Floor ${room.floorId}`,
-      status: room.status,
-      price: 0,
-      lastCleaned: room.lastCleaned || new Date().toISOString()
-    }));
-  }, [rooms]);
+    return rooms.map(room => {
+      const roomType = roomTypes?.find(rt => rt.roomTypeId === room.roomTypeId);
+      return {
+        id: String(room.roomId),
+        roomNumber: room.roomNumber,
+        type: room.roomTypeName || roomType?.typeName || `Type ${room.roomTypeId}`,
+        typeId: room.roomTypeId,
+        floor: room.floorNumber ? `Floor ${room.floorNumber}` : `Floor ${room.floorId}`,
+        floorId: room.floorNumber || room.floorId,
+        status: room.status,
+        price: roomType?.basePrice || 0,
+        lastCleaned: room.lastCleaned || new Date().toISOString()
+      };
+    });
+  }, [rooms, roomTypes]);
 
   const filteredRooms = roomsUI.filter(room => {
     const roomNum = room.roomNumber || '';
@@ -156,10 +164,9 @@ export default function RoomListPage() {
               className="bg-transparent border-none focus:outline-none text-xs font-medium"
             >
               <option value="All">All Types</option>
-              <option value="Standard">Standard</option>
-              <option value="Deluxe">Deluxe</option>
-              <option value="Suite">Suite</option>
-              <option value="Penthouse">Penthouse</option>
+              {roomTypes?.map(rt => (
+                <option key={rt.roomTypeId} value={rt.typeName}>{rt.typeName}</option>
+              ))}
             </select>
           </div>
           <div className="flex items-center gap-2 px-3 py-2 bg-[#f8f9fa] border border-[#1a1a1a]/5 rounded-xl">
@@ -232,7 +239,11 @@ export default function RoomListPage() {
                       >
                         <Eye size={16} />
                       </button>
-                      <button className="p-2 hover:bg-[#1a1a1a]/5 rounded-lg transition-colors text-[#1a1a1a]/60" title="Edit">
+                      <button 
+                        onClick={() => navigate(`/rooms/edit/${room.id}`)}
+                        className="p-2 hover:bg-[#1a1a1a]/5 rounded-lg transition-colors text-[#1a1a1a]/60" 
+                        title="Edit"
+                      >
                         <Edit2 size={16} />
                       </button>
                       <button className="p-2 hover:bg-red-50 rounded-lg transition-colors text-red-600" title="Maintenance">

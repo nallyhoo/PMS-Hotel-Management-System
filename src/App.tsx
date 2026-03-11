@@ -28,10 +28,12 @@ import RoomDetailsPage from './pages/rooms/RoomDetailsPage';
 import RoomStatusBoardPage from './pages/rooms/RoomStatusBoardPage';
 import RoomMaintenancePage from './pages/rooms/RoomMaintenancePage';
 import FloorManagementPage from './pages/rooms/FloorManagementPage';
+import CreateRoomPage from './pages/rooms/CreateRoomPage';
 
 import RoomTypeListPage from './pages/rooms/RoomTypeListPage';
 import RoomTypePricingPage from './pages/rooms/RoomTypePricingPage';
 import RoomTypeGalleryPage from './pages/rooms/RoomTypeGalleryPage';
+import CreateRoomTypePage from './pages/rooms/CreateRoomTypePage';
 
 import CheckinDashboardPage from './pages/checkin/CheckinDashboardPage';
 import ArrivalsListPage from './pages/checkin/ArrivalsListPage';
@@ -170,12 +172,16 @@ export default function App() {
         <Route path="/reservations/details/:id" element={<DashboardLayout><ReservationDetailsPage /></DashboardLayout>} />
 
         <Route path="/rooms/list" element={<DashboardLayout><RoomListPage /></DashboardLayout>} />
+        <Route path="/rooms/create" element={<DashboardLayout><CreateRoomPage /></DashboardLayout>} />
+        <Route path="/rooms/edit/:id" element={<DashboardLayout><CreateRoomPage /></DashboardLayout>} />
         <Route path="/rooms/details/:id" element={<DashboardLayout><RoomDetailsPage /></DashboardLayout>} />
         <Route path="/rooms/status" element={<DashboardLayout><RoomStatusBoardPage /></DashboardLayout>} />
         <Route path="/rooms/maintenance" element={<DashboardLayout><RoomMaintenancePage /></DashboardLayout>} />
         <Route path="/rooms/floors" element={<DashboardLayout><FloorManagementPage /></DashboardLayout>} />
 
         <Route path="/rooms/types" element={<DashboardLayout><RoomTypeListPage /></DashboardLayout>} />
+        <Route path="/rooms/types/create" element={<DashboardLayout><CreateRoomTypePage /></DashboardLayout>} />
+        <Route path="/rooms/types/edit/:id" element={<DashboardLayout><CreateRoomTypePage /></DashboardLayout>} />
         <Route path="/rooms/types/pricing/:id" element={<DashboardLayout><RoomTypePricingPage /></DashboardLayout>} />
         <Route path="/rooms/types/gallery/:id" element={<DashboardLayout><RoomTypeGalleryPage /></DashboardLayout>} />
 

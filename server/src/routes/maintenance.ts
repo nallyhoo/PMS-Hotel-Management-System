@@ -7,10 +7,13 @@ router.get('/requests', (req: Request, res: Response) => {
   try {
     const { status, priority, roomId } = req.query;
     let query = `
-      SELECT mr.*, r.RoomNumber, e.FirstName, e.LastName as ReportedByName
+      SELECT mr.*, r.RoomNumber, e.FirstName, e.LastName as ReportedByName,
+             ae.FirstName as AssignedToFirstName, ae.LastName as AssignedToLastName
       FROM MaintenanceRequests mr
       JOIN Rooms r ON mr.RoomID = r.RoomID
       LEFT JOIN Employees e ON mr.ReportedBy = e.EmployeeID
+      LEFT JOIN MaintenanceTasks mt ON mr.RequestID = mt.RequestID
+      LEFT JOIN Employees ae ON mt.AssignedStaffID = ae.EmployeeID
       WHERE 1=1
     `;
     const params: any[] = [];

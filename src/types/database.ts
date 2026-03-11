@@ -71,6 +71,8 @@ export interface Room {
   lastCleaned: string | null;
   createdDate: string;
   updatedDate: string;
+  roomTypeName?: string;
+  floorNumber?: number;
 }
 
 export type RoomStatus = 'Available' | 'Occupied' | 'Dirty' | 'Maintenance' | 'Reserved' | 'Blocked';

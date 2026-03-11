@@ -4,31 +4,41 @@ import {
   Edit2, 
   Wrench, 
   CheckCircle2, 
-  History,
   DoorOpen,
-  Layers,
-  Wifi,
-  Tv,
-  Coffee,
-  Wind,
-  Shield,
   Clock,
-  ChevronRight,
   AlertCircle
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { mockRooms, Room } from '../../data/mockRooms';
+import { useQuery } from '@tanstack/react-query';
+import roomService from '../../api/rooms';
+import type { RoomStatus } from '../../types/database';
 
 export default function RoomDetailsPage() {
   const navigate = useNavigate();
   const { id } = useParams();
   const [activeTab, setActiveTab] = useState('Overview');
   
-  const room = mockRooms.find(r => r.id === id) || mockRooms[0];
+  const { data: room, isLoading } = useQuery({
+    queryKey: ['room', id],
+    queryFn: () => roomService.getRoom(Number(id)),
+    enabled: !!id,
+  });
+
+  const { data: roomType } = useQuery({
+    queryKey: ['roomType', room?.roomTypeId],
+    queryFn: () => roomService.getRoomType(room?.roomTypeId || 0),
+    enabled: !!room?.roomTypeId,
+  });
+
+  const { data: roomImages } = useQuery({
+    queryKey: ['roomTypeImages', room?.roomTypeId],
+    queryFn: () => roomService.getRoomTypeImages(room?.roomTypeId || 0),
+    enabled: !!room?.roomTypeId,
+  });
 
   const tabs = ['Overview', 'Amenities', 'Housekeeping', 'Maintenance', 'History'];
 
-  const getStatusStyles = (status: Room['status']) => {
+  const getStatusStyles = (status: string) => {
     switch (status) {
       case 'Available': return 'bg-emerald-50 text-emerald-600 border-emerald-100';
       case 'Occupied': return 'bg-blue-50 text-blue-600 border-blue-100';
@@ -38,6 +48,37 @@ export default function RoomDetailsPage() {
       default: return 'bg-gray-50 text-gray-600 border-gray-100';
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1a1a1a]"></div>
+      </div>
+    );
+  }
+
+  if (!room) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px]">
+        <p className="text-gray-500">Room not found</p>
+        <button 
+          onClick={() => navigate('/rooms/list')}
+          className="mt-4 px-4 py-2 bg-[#1a1a1a] text-white rounded-lg"
+        >
+          Back to Rooms
+        </button>
+      </div>
+    );
+  }
+
+  const rt: any = roomType;
+  const roomTypeName = rt?.typeName || rt?.TypeName || `Type ${room?.roomTypeId}`;
+  const roomPrice = rt?.basePrice || rt?.BasePrice || 0;
+  const roomDescription = rt?.description || rt?.Description || '';
+  const roomImagesList = roomImages?.map((img: any) => img.imageUrl || img.ImageURL) || [];
+  const floorNumber = (room as any).floorNumber || `Floor ${room?.floorId}`;
+
+  const mainImage = roomImagesList.length > 0 ? roomImagesList[0] : null;
 
   return (
     <div className="max-w-6xl mx-auto space-y-8">
@@ -57,11 +98,14 @@ export default function RoomDetailsPage() {
                 {room.status}
               </span>
             </div>
-            <p className="text-sm text-[#1a1a1a]/60 font-light">{room.type} • {room.floor}</p>
+            <p className="text-sm text-[#1a1a1a]/60 font-light">{roomTypeName} • {floorNumber}</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <button className="flex items-center gap-2 px-4 py-2 bg-white border border-[#1a1a1a]/10 rounded-xl text-xs font-medium uppercase tracking-widest hover:bg-[#f8f9fa] transition-colors">
+          <button 
+            onClick={() => navigate(`/rooms/edit/${room.roomId}`)}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-[#1a1a1a]/10 rounded-xl text-xs font-medium uppercase tracking-widest hover:bg-[#f8f9fa] transition-colors"
+          >
             <Edit2 size={14} />
             Edit Room
           </button>
@@ -98,6 +142,17 @@ export default function RoomDetailsPage() {
           <div className="bg-white p-8 rounded-2xl border border-[#1a1a1a]/5 shadow-sm min-h-[400px]">
             {activeTab === 'Overview' && (
               <div className="space-y-8 animate-in fade-in duration-500">
+                {/* Room Image */}
+                <div className="aspect-video rounded-2xl overflow-hidden bg-[#f8f9fa]">
+                  {mainImage ? (
+                    <img src={mainImage} alt={roomTypeName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-[#1a1a1a]/20">
+                      <DoorOpen size={64} />
+                    </div>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-2 gap-8">
                   <div className="space-y-4">
                     <div className="flex items-center gap-3 text-[#1a1a1a]/40">
@@ -107,15 +162,19 @@ export default function RoomDetailsPage() {
                     <div className="p-4 bg-[#f8f9fa] rounded-xl border border-[#1a1a1a]/5 space-y-3">
                       <div className="flex justify-between">
                         <span className="text-xs text-[#1a1a1a]/40">Room Type</span>
-                        <span className="text-xs font-medium">{room.type}</span>
+                        <span className="text-xs font-medium">{roomTypeName}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-xs text-[#1a1a1a]/40">Floor</span>
-                        <span className="text-xs font-medium">{room.floor}</span>
+                        <span className="text-xs font-medium">{floorNumber}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-xs text-[#1a1a1a]/40">Base Price</span>
-                        <span className="text-xs font-medium font-serif">${room.price} / night</span>
+                        <span className="text-xs font-medium font-serif">${roomPrice} / night</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-xs text-[#1a1a1a]/40">Cleaning Status</span>
+                        <span className="text-xs font-medium">{room?.cleaningStatus || 'N/A'}</span>
                       </div>
                     </div>
                   </div>
@@ -127,7 +186,7 @@ export default function RoomDetailsPage() {
                     <div className="p-4 bg-[#f8f9fa] rounded-xl border border-[#1a1a1a]/5 space-y-3">
                       <div className="flex justify-between">
                         <span className="text-xs text-[#1a1a1a]/40">Last Cleaned</span>
-                        <span className="text-xs font-medium">{new Date(room.lastCleaned).toLocaleString()}</span>
+                        <span className="text-xs font-medium">{room?.lastCleaned ? new Date(room.lastCleaned).toLocaleString() : 'N/A'}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-xs text-[#1a1a1a]/40">Last Checkout</span>
@@ -140,8 +199,7 @@ export default function RoomDetailsPage() {
                 <div className="space-y-4">
                   <h3 className="text-sm font-serif">Quick Description</h3>
                   <p className="text-sm text-[#1a1a1a]/60 font-light leading-relaxed">
-                    This {room.type.toLowerCase()} room on the {room.floor.toLowerCase()} offers a premium experience with modern amenities. 
-                    It features a spacious layout, high-quality furnishings, and is currently in {room.status.toLowerCase()} status.
+                    {roomDescription || `This ${roomTypeName?.toLowerCase() || 'room'} on the ${floorNumber?.toLowerCase() || 'floor'} offers a premium experience with modern amenities.`}
                   </p>
                 </div>
               </div>
@@ -149,18 +207,9 @@ export default function RoomDetailsPage() {
 
             {activeTab === 'Amenities' && (
               <div className="grid grid-cols-2 md:grid-cols-3 gap-6 animate-in fade-in duration-500">
-                {room.amenities.map((amenity, idx) => (
-                  <div key={idx} className="flex items-center gap-3 p-4 bg-[#f8f9fa] rounded-xl border border-[#1a1a1a]/5">
-                    <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center shadow-sm">
-                      {amenity === 'Wi-Fi' && <Wifi size={16} className="text-[#1a1a1a]/60" />}
-                      {amenity === 'TV' && <Tv size={16} className="text-[#1a1a1a]/60" />}
-                      {amenity === 'Mini Bar' && <Coffee size={16} className="text-[#1a1a1a]/60" />}
-                      {amenity === 'Ocean View' && <Wind size={16} className="text-[#1a1a1a]/60" />}
-                      {!['Wi-Fi', 'TV', 'Mini Bar', 'Ocean View'].includes(amenity) && <Shield size={16} className="text-[#1a1a1a]/60" />}
-                    </div>
-                    <span className="text-xs font-medium">{amenity}</span>
-                  </div>
-                ))}
+                <div className="flex items-center gap-3 p-4 bg-[#f8f9fa] rounded-xl border border-[#1a1a1a]/5">
+                  <span className="text-xs font-medium">No amenities data available</span>
+                </div>
               </div>
             )}
           </div>

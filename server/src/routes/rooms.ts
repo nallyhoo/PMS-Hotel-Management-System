@@ -62,7 +62,7 @@ router.get('/', (req: Request, res: Response) => {
 // Get room by ID
 router.get('/:id', (req: Request, res: Response) => {
   try {
-    const room = db.prepare(`
+    const room: any = db.prepare(`
       SELECT r.*, rt.TypeName as RoomTypeName, f.FloorNumber
       FROM Rooms r
       LEFT JOIN RoomTypes rt ON r.RoomTypeID = rt.RoomTypeID
@@ -73,7 +73,24 @@ router.get('/:id', (req: Request, res: Response) => {
     if (!room) {
       return res.status(404).json({ error: 'Room not found' });
     }
-    res.json(room);
+
+    const transformed = {
+      roomId: room.RoomID,
+      branchId: room.BranchID,
+      roomNumber: room.RoomNumber,
+      roomTypeId: room.RoomTypeID,
+      floorId: room.FloorID,
+      status: room.Status,
+      currentReservationId: room.CurrentReservationID,
+      cleaningStatus: room.CleaningStatus,
+      notes: room.Notes,
+      lastCleaned: room.LastCleaned,
+      createdDate: room.CreatedDate,
+      updatedDate: room.UpdatedDate,
+      roomTypeName: room.RoomTypeName,
+      floorNumber: room.FloorNumber,
+    };
+    res.json(transformed);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch room' });
   }
@@ -170,7 +187,18 @@ router.get('/availability/check', (req: Request, res: Response) => {
 router.get('/types/list', (req: Request, res: Response) => {
   try {
     const roomTypes = db.prepare('SELECT * FROM RoomTypes WHERE IsActive = 1').all();
-    res.json(roomTypes);
+    const transformed = roomTypes.map((rt: any) => ({
+      roomTypeId: rt.RoomTypeID,
+      typeName: rt.TypeName,
+      description: rt.Description,
+      capacity: rt.Capacity,
+      basePrice: rt.BasePrice,
+      maxOccupancy: rt.MaxOccupancy,
+      bedType: rt.BedType,
+      sizeSqFt: rt.SizeSqFt,
+      isActive: rt.IsActive,
+    }));
+    res.json(transformed);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch room types' });
   }
@@ -182,7 +210,18 @@ router.get('/types/:id', (req: Request, res: Response) => {
     if (!roomType) {
       return res.status(404).json({ error: 'Room type not found' });
     }
-    res.json(roomType);
+    const rt: any = roomType;
+    res.json({
+      roomTypeId: rt.RoomTypeID,
+      typeName: rt.TypeName,
+      description: rt.Description,
+      capacity: rt.Capacity,
+      basePrice: rt.BasePrice,
+      maxOccupancy: rt.MaxOccupancy,
+      bedType: rt.BedType,
+      sizeSqFt: rt.SizeSqFt,
+      isActive: rt.IsActive,
+    });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch room type' });
   }
@@ -269,6 +308,107 @@ router.get('/status-board', (req: Request, res: Response) => {
     res.json(statusBoard);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch status board' });
+  }
+});
+
+// Get all floors
+router.get('/floors/list', (req: Request, res: Response) => {
+  try {
+    const floors = db.prepare('SELECT * FROM Floors WHERE BranchID = 1 ORDER BY FloorNumber').all();
+    res.json(floors);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch floors' });
+  }
+});
+
+// Create new floor
+router.post('/floors', (req: Request, res: Response) => {
+  try {
+    const { floorNumber, floorName, description } = req.body;
+    const result = db.prepare(`
+      INSERT INTO Floors (BranchID, FloorNumber, FloorName, Description)
+      VALUES (1, ?, ?, ?)
+    `).run(floorNumber, floorName, description);
+    res.status(201).json({ floorId: result.lastInsertRowid });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to create floor' });
+  }
+});
+
+// Update floor
+router.put('/floors/:id', (req: Request, res: Response) => {
+  try {
+    const { floorNumber, floorName, description } = req.body;
+    db.prepare(`
+      UPDATE Floors SET FloorNumber = ?, FloorName = ?, Description = ?
+      WHERE FloorID = ?
+    `).run(floorNumber, floorName, description, req.params.id);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update floor' });
+  }
+});
+
+// Delete floor
+router.delete('/floors/:id', (req: Request, res: Response) => {
+  try {
+    db.prepare('DELETE FROM Floors WHERE FloorID = ?').run(req.params.id);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete floor' });
+  }
+});
+
+// Get images for a room type
+router.get('/types/:id/images', (req: Request, res: Response) => {
+  try {
+    const roomTypeId = parseInt(req.params.id);
+    const images = db.prepare('SELECT * FROM RoomImages WHERE RoomTypeID = ? ORDER BY SortOrder, CreatedDate').all(roomTypeId);
+    const transformed = images.map((img: any) => ({
+      imageId: img.ImageID,
+      roomTypeId: img.RoomTypeID,
+      imageUrl: img.ImageURL,
+      isPrimary: img.IsPrimary,
+      sortOrder: img.SortOrder,
+    }));
+    res.json(transformed);
+  } catch (error) {
+    console.error('Error fetching images:', error);
+    res.status(500).json({ error: 'Failed to fetch images' });
+  }
+});
+
+// Add image to room type
+router.post('/types/:id/images', (req: Request, res: Response) => {
+  try {
+    const { imageUrl, isPrimary, sortOrder } = req.body;
+    const roomTypeId = parseInt(req.params.id);
+    
+    if (isNaN(roomTypeId)) {
+      return res.status(400).json({ error: 'Invalid room type ID' });
+    }
+    
+    if (!imageUrl) {
+      return res.status(400).json({ error: 'Image URL is required' });
+    }
+    
+    const result = db.prepare(
+      'INSERT INTO RoomImages (RoomTypeID, ImageURL, IsPrimary, SortOrder) VALUES (?, ?, ?, ?)'
+    ).run(roomTypeId, imageUrl, isPrimary ? 1 : 0, sortOrder || 0);
+    res.json({ imageId: result.lastInsertRowid });
+  } catch (error) {
+    console.error('Error adding image:', error);
+    res.status(500).json({ error: 'Failed to add image' });
+  }
+});
+
+// Delete image from room type
+router.delete('/images/:id', (req: Request, res: Response) => {
+  try {
+    db.prepare('DELETE FROM RoomImages WHERE ImageID = ?').run(req.params.id);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete image' });
   }
 });
 
