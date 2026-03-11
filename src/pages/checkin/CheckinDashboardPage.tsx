@@ -10,21 +10,36 @@ import {
   UserCheck
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { mockReservations } from '../../data/mockReservations';
+import { useQuery } from '@tanstack/react-query';
+import reservationService from '../../api/reservations';
+import { format, parseISO } from 'date-fns';
 
 export default function CheckinDashboardPage() {
   const navigate = useNavigate();
+  const today = format(new Date(), 'yyyy-MM-dd');
 
-  // Filter for today's arrivals
-  const todayArrivals = mockReservations.filter(res => res.status === 'Confirmed');
-  const checkedInToday = mockReservations.filter(res => res.status === 'Checked In').length;
+  const { data: reservationsData, isLoading } = useQuery({
+    queryKey: ['reservations', 'dashboard'],
+    queryFn: () => reservationService.getReservations({ limit: 100 }),
+  });
+
+  const reservations = reservationsData?.data || [];
+  
+  const todayArrivals = reservations.filter((res: any) => 
+    res.status === 'Confirmed' && res.checkInDate === today
+  );
+  
+  const checkedInToday = reservations.filter((res: any) => 
+    res.status === 'Checked In'
+  ).length;
+  
   const pendingArrivals = todayArrivals.length;
 
   const stats = [
     { label: 'Total Arrivals', value: pendingArrivals + checkedInToday, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
     { label: 'Pending Check-in', value: pendingArrivals, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50' },
     { label: 'Checked In', value: checkedInToday, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { label: 'VIP Arrivals', value: 3, icon: UserCheck, color: 'text-purple-600', bg: 'bg-purple-50' },
+    { label: 'VIP Arrivals', value: 0, icon: UserCheck, color: 'text-purple-600', bg: 'bg-purple-50' },
   ];
 
   return (
@@ -73,18 +88,18 @@ export default function CheckinDashboardPage() {
               </button>
             </div>
             <div className="divide-y divide-[#1a1a1a]/5">
-              {todayArrivals.slice(0, 5).map((res) => (
-                <div key={res.id} className="p-6 hover:bg-[#f8f9fa] transition-colors flex items-center justify-between group">
+              {todayArrivals.slice(0, 5).map((res: any) => (
+                <div key={res.reservationId} className="p-6 hover:bg-[#f8f9fa] transition-colors flex items-center justify-between group">
                   <div className="flex items-center gap-4">
                     <div className="w-10 h-10 rounded-full bg-[#1a1a1a]/5 flex items-center justify-center text-[#1a1a1a]/40 font-serif">
-                      {res.guestName.charAt(0)}
+                      {res.firstName ? res.firstName.charAt(0) : 'G'}
                     </div>
                     <div>
-                      <h4 className="text-sm font-medium">{res.guestName}</h4>
+                      <h4 className="text-sm font-medium">{res.firstName} {res.lastName}</h4>
                       <div className="flex items-center gap-3 text-[10px] text-[#1a1a1a]/40 font-medium uppercase tracking-wider">
-                        <span>{res.id}</span>
+                        <span>{res.reservationCode}</span>
                         <span>•</span>
-                        <span>{res.roomType}</span>
+                        <span>{res.roomTypeName || 'Standard'}</span>
                       </div>
                     </div>
                   </div>
@@ -94,7 +109,7 @@ export default function CheckinDashboardPage() {
                       <p className="text-[10px] text-[#1a1a1a]/40 uppercase tracking-widest font-bold">14:00 PM</p>
                     </div>
                     <button 
-                      onClick={() => navigate(`/checkin/process/${res.id}`)}
+                      onClick={() => navigate(`/checkin/process/${res.reservationId}`)}
                       className="px-4 py-2 bg-[#1a1a1a] text-white rounded-lg text-[10px] uppercase tracking-widest font-bold hover:bg-[#333] transition-colors"
                     >
                       Start Check-in
@@ -111,7 +126,10 @@ export default function CheckinDashboardPage() {
           <div className="bg-[#1a1a1a] text-white p-8 rounded-2xl shadow-xl space-y-6">
             <h3 className="text-lg font-serif">Quick Actions</h3>
             <div className="grid grid-cols-1 gap-3">
-              <button className="w-full py-3 px-4 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-medium uppercase tracking-widest transition-colors text-left flex items-center justify-between">
+              <button 
+                onClick={() => navigate('/checkin/walkin')}
+                className="w-full py-3 px-4 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-medium uppercase tracking-widest transition-colors text-left flex items-center justify-between"
+              >
                 Walk-in Reservation <Plus size={14} />
               </button>
               <button className="w-full py-3 px-4 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-medium uppercase tracking-widest transition-colors text-left flex items-center justify-between">

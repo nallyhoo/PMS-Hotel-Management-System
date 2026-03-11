@@ -38,6 +38,7 @@ import CreateRoomTypePage from './pages/rooms/CreateRoomTypePage';
 import CheckinDashboardPage from './pages/checkin/CheckinDashboardPage';
 import ArrivalsListPage from './pages/checkin/ArrivalsListPage';
 import CheckinProcessPage from './pages/checkin/CheckinProcessPage';
+import WalkinReservationPage from './pages/checkin/WalkinReservationPage';
 
 import CheckoutDashboardPage from './pages/checkout/CheckoutDashboardPage';
 import CheckoutProcessPage from './pages/checkout/CheckoutProcessPage';
@@ -186,6 +187,7 @@ export default function App() {
         <Route path="/rooms/types/gallery/:id" element={<DashboardLayout><RoomTypeGalleryPage /></DashboardLayout>} />
 
         <Route path="/checkin" element={<DashboardLayout><CheckinDashboardPage /></DashboardLayout>} />
+        <Route path="/checkin/walkin" element={<DashboardLayout><WalkinReservationPage /></DashboardLayout>} />
         <Route path="/checkin/arrivals" element={<DashboardLayout><ArrivalsListPage /></DashboardLayout>} />
         <Route path="/checkin/process/:id" element={<DashboardLayout><CheckinProcessPage /></DashboardLayout>} />
 

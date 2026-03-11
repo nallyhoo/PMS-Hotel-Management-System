@@ -10,21 +10,28 @@ import {
   Receipt
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { mockReservations } from '../../data/mockReservations';
+import { useQuery } from '@tanstack/react-query';
+import reservationService from '../../api/reservations';
 
 export default function CheckoutDashboardPage() {
   const navigate = useNavigate();
 
-  // Filter for today's departures (Checked In guests)
-  const todayDepartures = mockReservations.filter(res => res.status === 'Checked In');
-  const checkedOutToday = mockReservations.filter(res => res.status === 'Checked Out').length;
+  const { data: reservationsData, isLoading } = useQuery({
+    queryKey: ['reservations', 'checkout'],
+    queryFn: () => reservationService.getReservations({ limit: 100 }),
+  });
+
+  const reservations = reservationsData?.data || [];
+  
+  const todayDepartures = reservations.filter((res: any) => res.status === 'Checked In');
+  const checkedOutToday = reservations.filter((res: any) => res.status === 'Checked Out').length;
   const pendingDepartures = todayDepartures.length;
 
   const stats = [
     { label: 'Total Departures', value: pendingDepartures + checkedOutToday, icon: LogOut, color: 'text-blue-600', bg: 'bg-blue-50' },
     { label: 'Pending Checkout', value: pendingDepartures, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50' },
     { label: 'Completed', value: checkedOutToday, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { label: 'Pending Payments', value: 2, icon: CreditCard, color: 'text-red-600', bg: 'bg-red-50' },
+    { label: 'Pending Payments', value: 0, icon: CreditCard, color: 'text-red-600', bg: 'bg-red-50' },
   ];
 
   return (
@@ -72,18 +79,18 @@ export default function CheckoutDashboardPage() {
               </button>
             </div>
             <div className="divide-y divide-[#1a1a1a]/5">
-              {todayDepartures.slice(0, 5).map((res) => (
-                <div key={res.id} className="p-6 hover:bg-[#f8f9fa] transition-colors flex items-center justify-between group">
+              {todayDepartures.slice(0, 5).map((res: any) => (
+                <div key={res.reservationId} className="p-6 hover:bg-[#f8f9fa] transition-colors flex items-center justify-between group">
                   <div className="flex items-center gap-4">
                     <div className="w-10 h-10 rounded-full bg-[#1a1a1a]/5 flex items-center justify-center text-[#1a1a1a]/40 font-serif">
-                      {res.roomNumber || '??'}
+                      {res.firstName ? res.firstName.charAt(0) : 'G'}
                     </div>
                     <div>
-                      <h4 className="text-sm font-medium">{res.guestName}</h4>
+                      <h4 className="text-sm font-medium">{res.firstName} {res.lastName}</h4>
                       <div className="flex items-center gap-3 text-[10px] text-[#1a1a1a]/40 font-medium uppercase tracking-wider">
-                        <span>{res.id}</span>
+                        <span>{res.reservationCode}</span>
                         <span>•</span>
-                        <span>{res.roomType}</span>
+                        <span>{res.roomTypeName || 'Standard'}</span>
                       </div>
                     </div>
                   </div>
@@ -93,7 +100,7 @@ export default function CheckoutDashboardPage() {
                       <p className="text-[10px] text-[#1a1a1a]/40 uppercase tracking-widest font-bold">11:00 AM</p>
                     </div>
                     <button 
-                      onClick={() => navigate(`/checkout/process/${res.id}`)}
+                      onClick={() => navigate(`/checkout/process/${res.reservationId}`)}
                       className="px-4 py-2 bg-[#1a1a1a] text-white rounded-lg text-[10px] uppercase tracking-widest font-bold hover:bg-[#333] transition-colors"
                     >
                       Process Check-out

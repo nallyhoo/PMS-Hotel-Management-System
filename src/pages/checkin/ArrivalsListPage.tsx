@@ -12,15 +12,27 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { mockReservations } from '../../data/mockReservations';
+import { useQuery } from '@tanstack/react-query';
+import reservationService from '../../api/reservations';
+import { format } from 'date-fns';
 
 export default function ArrivalsListPage() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
+  const today = format(new Date(), 'yyyy-MM-dd');
 
-  const arrivals = mockReservations.filter(res => 
+  const { data: reservationsData, isLoading } = useQuery({
+    queryKey: ['reservations', 'arrivals'],
+    queryFn: () => reservationService.getReservations({ limit: 100 }),
+  });
+
+  const reservations = reservationsData?.data || [];
+
+  const arrivals = reservations.filter((res: any) => 
     (res.status === 'Confirmed' || res.status === 'Checked In') &&
-    res.guestName.toLowerCase().includes(searchTerm.toLowerCase())
+    (res.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+     res.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+     res.reservationCode?.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   return (
@@ -61,29 +73,29 @@ export default function ArrivalsListPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1a1a1a]/5">
-              {arrivals.map((res) => (
-                <tr key={res.id} className="hover:bg-[#f8f9fa] transition-colors group">
+              {arrivals.map((res: any) => (
+                <tr key={res.reservationId} className="hover:bg-[#f8f9fa] transition-colors group">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-[#1a1a1a]/5 flex items-center justify-center text-[#1a1a1a]/40 font-serif text-xs">
-                        {res.guestName.charAt(0)}
+                        {res.firstName ? res.firstName.charAt(0) : 'G'}
                       </div>
                       <div>
-                        <p className="text-sm font-medium">{res.guestName}</p>
-                        <p className="text-[10px] text-[#1a1a1a]/40 uppercase tracking-widest font-bold">{res.id}</p>
+                        <p className="text-sm font-medium">{res.firstName} {res.lastName}</p>
+                        <p className="text-[10px] text-[#1a1a1a]/40 uppercase tracking-widest font-bold">{res.reservationCode}</p>
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2 text-xs text-[#1a1a1a]/60">
                       <Calendar size={12} />
-                      <span>{res.checkIn} - {res.checkOut}</span>
+                      <span>{res.checkInDate} - {res.checkOutDate}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2 text-xs text-[#1a1a1a]/60">
                       <MapPin size={12} />
-                      <span>{res.roomType}</span>
+                      <span>{res.roomTypeName || 'Standard'}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4">
@@ -103,14 +115,14 @@ export default function ArrivalsListPage() {
                     <div className="flex items-center justify-end gap-2">
                       {res.status === 'Confirmed' ? (
                         <button 
-                          onClick={() => navigate(`/checkin/process/${res.id}`)}
+                          onClick={() => navigate(`/checkin/process/${res.reservationId}`)}
                           className="px-3 py-1.5 bg-[#1a1a1a] text-white rounded-lg text-[10px] uppercase tracking-widest font-bold hover:bg-[#333] transition-colors"
                         >
                           Check-in
                         </button>
                       ) : (
                         <button 
-                          onClick={() => navigate(`/reservations/details/${res.id}`)}
+                          onClick={() => navigate(`/reservations/details/${res.reservationId}`)}
                           className="px-3 py-1.5 border border-[#1a1a1a]/10 rounded-lg text-[10px] uppercase tracking-widest font-bold hover:bg-[#f8f9fa] transition-colors"
                         >
                           Details
