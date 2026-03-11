@@ -120,9 +120,9 @@ class ReservationService {
     return api.post<{ noteId: number }>(`/reservations/${id}/notes`, data);
   }
 
-  async getReservationCalendar(startDate: string, endDate: string): Promise<Reservation[]> {
+  async getReservationCalendar(startDate: string, endDate: string): Promise<any> {
     const queryParams = new URLSearchParams({ startDate, endDate });
-    return api.get<Reservation[]>(`/reservations/calendar?${queryParams}`);
+    return api.get<any>(`/reservations/calendar?${queryParams}`);
   }
 
   async getReservationRooms(id: number): Promise<ReservationRoom[]> {
@@ -131,6 +131,10 @@ class ReservationService {
 
   async getReservationHistory(id: number): Promise<ReservationHistory[]> {
     return api.get<ReservationHistory[]>(`/reservations/${id}/history`);
+  }
+
+  async getRoomTypes(): Promise<any[]> {
+    return api.get<any[]>('/rooms/types/list');
   }
 }
 

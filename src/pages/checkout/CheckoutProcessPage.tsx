@@ -15,13 +15,15 @@ import {
   ArrowRight,
   Mail,
   Printer,
-  Download,
+  Loader2,
+  DollarSign,
   Plus,
   Minus
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { mockReservations } from '../../data/mockReservations';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import reservationService from '../../api/reservations';
+import { format, differenceInDays } from 'date-fns';
 
 type Step = 'invoice' | 'payment' | 'summary';
 
@@ -36,11 +38,26 @@ interface InvoiceItem {
 export default function CheckoutProcessPage() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const reservation = mockReservations.find(res => res.id === id) || mockReservations[0];
   const [currentStep, setCurrentStep] = useState<Step>('invoice');
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'cash' | 'transfer'>('card');
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [emailSent, setEmailSent] = useState(false);
+  const [roomInspected, setRoomInspected] = useState(false);
+  const [inspectionNotes, setInspectionNotes] = useState('');
+  const [additionalCharges, setAdditionalCharges] = useState(0);
+  const [notes, setNotes] = useState('');
+
+  const { data: reservation, isLoading, error } = useQuery({
+    queryKey: ['reservation', id],
+    queryFn: () => reservationService.getReservation(Number(id)),
+    enabled: !!id,
+  });
+
+  const checkoutMutation = useMutation({
+    mutationFn: (data: { totalBill: number; paymentStatus: string; roomInspected: boolean; inspectionNotes?: string; notes?: string }) => 
+      reservationService.checkOut(Number(id), data),
+    onSuccess: () => {
+      setCurrentStep('summary');
+    },
+  });
 
   const steps: { id: Step; label: string; icon: any }[] = [
     { id: 'invoice', label: 'Invoice Review', icon: Receipt },
@@ -48,30 +65,57 @@ export default function CheckoutProcessPage() {
     { id: 'summary', label: 'Summary', icon: CheckCircle2 },
   ];
 
-  const [invoiceItems] = useState<InvoiceItem[]>([
-    { id: '1', description: 'Room Charge (5 Nights)', date: '2026-03-10', amount: 1250, type: 'room' },
-    { id: '2', description: 'Minibar - Beverages', date: '2026-03-12', amount: 45, type: 'service' },
-    { id: '3', description: 'Laundry Service', date: '2026-03-13', amount: 35, type: 'service' },
-    { id: '4', description: 'City Tax', date: '2026-03-15', amount: 25, type: 'tax' },
-  ]);
+  const nights = reservation ? differenceInDays(
+    new Date(reservation.checkOutDate || reservation.checkOutDate), 
+    new Date(reservation.checkInDate || reservation.checkInDate)
+  ) : 0;
 
-  const subtotal = invoiceItems.reduce((acc, item) => acc + item.amount, 0);
-  const total = subtotal; // Simplified for demo
+  const roomCharge = reservation?.totalAmount || 0;
+  const taxes = Math.round(roomCharge * 0.1);
+  const subtotal = roomCharge + additionalCharges;
+  const total = subtotal + taxes;
 
   const handleNext = () => {
     if (currentStep === 'invoice') setCurrentStep('payment');
     else if (currentStep === 'payment') {
-      setIsProcessing(true);
-      setTimeout(() => {
-        setIsProcessing(false);
-        setCurrentStep('summary');
-      }, 2000);
+      checkoutMutation.mutate({
+        totalBill: total,
+        paymentStatus: 'Paid',
+        roomInspected,
+        inspectionNotes: inspectionNotes || undefined,
+        notes: notes || undefined,
+      });
     }
   };
 
-  const handleFinish = () => {
-    navigate('/checkout');
+  const canProceed = () => {
+    if (currentStep === 'invoice') return true;
+    if (currentStep === 'payment') return true;
+    return true;
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 size={32} className="animate-spin text-[#1a1a1a]/40" />
+      </div>
+    );
+  }
+
+  if (error || !reservation) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
+        <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
+        <h3 className="text-lg font-medium text-gray-900 mb-2">Failed to load reservation</h3>
+        <button 
+          onClick={() => navigate('/checkout')}
+          className="px-4 py-2 bg-[#1a1a1a] text-white rounded-lg text-sm hover:bg-[#333]"
+        >
+          Back to Check-out
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-5xl mx-auto space-y-8">
@@ -86,16 +130,19 @@ export default function CheckoutProcessPage() {
           </button>
           <div>
             <h1 className="text-2xl font-serif font-light">Check-out Process</h1>
-            <p className="text-sm text-[#1a1a1a]/60 font-light">Room {reservation.roomNumber} • {reservation.guestName}</p>
+            <p className="text-sm text-[#1a1a1a]/60 font-light">
+              {reservation.reservationCode} • {reservation.firstName} {reservation.lastName}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           {steps.map((step, idx) => (
             <React.Fragment key={step.id}>
               <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all ${
-                currentStep === step.id ? 'bg-[#1a1a1a] text-white' : 'text-[#1a1a1a]/40'
+                currentStep === step.id ? 'bg-[#1a1a1a] text-white' : 
+                steps.findIndex(s => s.id === currentStep) > idx ? 'bg-emerald-500 text-white' : 'text-[#1a1a1a]/40'
               }`}>
-                <step.icon size={14} />
+                {steps.findIndex(s => s.id === currentStep) > idx ? <Check size={14} /> : <step.icon size={14} />}
                 <span className="text-[10px] uppercase tracking-widest font-bold hidden sm:block">{step.label}</span>
               </div>
               {idx < steps.length - 1 && <ChevronRight size={14} className="text-[#1a1a1a]/20" />}
@@ -104,285 +151,239 @@ export default function CheckoutProcessPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Step Content */}
-        <div className="lg:col-span-2 space-y-8">
-          <AnimatePresence mode="wait">
-            {currentStep === 'invoice' && (
-              <motion.div 
-                key="invoice"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="bg-white p-8 rounded-2xl border border-[#1a1a1a]/5 shadow-sm space-y-8"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="space-y-2">
-                    <h3 className="text-xl font-serif">Invoice Review</h3>
-                    <p className="text-sm text-[#1a1a1a]/60 font-light">Review all charges with the guest before proceeding to payment.</p>
-                  </div>
-                  <button className="flex items-center gap-2 px-4 py-2 border border-[#1a1a1a]/10 rounded-xl text-[10px] uppercase tracking-widest font-bold hover:bg-[#f8f9fa] transition-colors">
-                    <Plus size={14} /> Add Charge
-                  </button>
-                </div>
-
-                <div className="bg-[#f8f9fa] rounded-2xl overflow-hidden border border-[#1a1a1a]/5">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="text-[10px] uppercase tracking-widest font-bold text-[#1a1a1a]/40 border-b border-[#1a1a1a]/5">
-                        <th className="px-6 py-4">Description</th>
-                        <th className="px-6 py-4">Date</th>
-                        <th className="px-6 py-4 text-right">Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#1a1a1a]/5">
-                      {invoiceItems.map((item) => (
-                        <tr key={item.id} className="text-sm">
-                          <td className="px-6 py-4 font-medium">{item.description}</td>
-                          <td className="px-6 py-4 text-[#1a1a1a]/60">{item.date}</td>
-                          <td className="px-6 py-4 text-right font-medium">${item.amount.toFixed(2)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    <tfoot>
-                      <tr className="bg-[#1a1a1a]/5 font-serif">
-                        <td colSpan={2} className="px-6 py-4 text-right">Total Amount Due</td>
-                        <td className="px-6 py-4 text-right text-lg">${total.toFixed(2)}</td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-
-                <div className="pt-6 border-t border-[#1a1a1a]/5 flex justify-end gap-4">
-                  <button className="flex items-center gap-2 px-6 py-3 border border-[#1a1a1a]/10 rounded-xl text-xs font-medium uppercase tracking-widest hover:bg-[#f8f9fa] transition-colors">
-                    <Printer size={14} /> Print Draft
-                  </button>
-                  <button 
-                    onClick={handleNext}
-                    className="flex items-center gap-2 px-6 py-3 bg-[#1a1a1a] text-white rounded-xl text-xs font-medium uppercase tracking-widest hover:bg-[#333] transition-colors"
-                  >
-                    Proceed to Payment
-                    <ArrowRight size={14} />
-                  </button>
-                </div>
-              </motion.div>
-            )}
-
-            {currentStep === 'payment' && (
-              <motion.div 
-                key="payment"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="bg-white p-8 rounded-2xl border border-[#1a1a1a]/5 shadow-sm space-y-8"
-              >
-                <div className="space-y-2">
-                  <h3 className="text-xl font-serif">Payment Collection</h3>
-                  <p className="text-sm text-[#1a1a1a]/60 font-light">Select payment method and process the final balance of ${total.toFixed(2)}.</p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {[
-                    { id: 'card', label: 'Credit Card', icon: CreditCard },
-                    { id: 'cash', label: 'Cash', icon: DollarSign },
-                    { id: 'transfer', label: 'Bank Transfer', icon: Globe },
-                  ].map((method) => (
-                    <button 
-                      key={method.id}
-                      onClick={() => setPaymentMethod(method.id as any)}
-                      className={`p-6 rounded-2xl border-2 transition-all flex flex-col items-center gap-3 ${
-                        paymentMethod === method.id 
-                          ? 'border-[#1a1a1a] bg-[#1a1a1a]/5' 
-                          : 'border-[#1a1a1a]/5 hover:border-[#1a1a1a]/20'
-                      }`}
-                    >
-                      <method.icon size={24} className={paymentMethod === method.id ? 'text-[#1a1a1a]' : 'text-[#1a1a1a]/20'} />
-                      <span className="text-[10px] uppercase tracking-widest font-bold">{method.label}</span>
-                    </button>
-                  ))}
-                </div>
-
-                {paymentMethod === 'card' && (
-                  <div className="p-8 bg-[#f8f9fa] rounded-2xl border border-[#1a1a1a]/5 space-y-6">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-xs font-bold uppercase tracking-widest">Card on File</h4>
-                      <span className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded font-bold">VISA •••• 4242</span>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div className="flex-1 p-4 bg-white rounded-xl border border-[#1a1a1a]/10 flex items-center justify-between">
-                        <span className="text-xs text-[#1a1a1a]/40">Authorization Code</span>
-                        <span className="text-sm font-mono">#AUTH-9283</span>
-                      </div>
-                      <button className="px-4 py-4 bg-white border border-[#1a1a1a]/10 rounded-xl text-xs font-medium hover:bg-[#f8f9fa] transition-colors">
-                        Use Different Card
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                <div className="pt-6 border-t border-[#1a1a1a]/5 flex justify-between items-center">
-                  <button 
-                    onClick={() => setCurrentStep('invoice')}
-                    className="text-xs font-medium uppercase tracking-widest text-[#1a1a1a]/40 hover:text-[#1a1a1a]"
-                  >
-                    Back to Invoice
-                  </button>
-                  <button 
-                    disabled={isProcessing}
-                    onClick={handleNext}
-                    className="flex items-center gap-2 px-8 py-3 bg-[#1a1a1a] text-white rounded-xl text-xs font-medium uppercase tracking-widest hover:bg-[#333] transition-colors disabled:opacity-50"
-                  >
-                    {isProcessing ? 'Processing...' : `Pay $${total.toFixed(2)}`}
-                    {!isProcessing && <ArrowRight size={14} />}
-                  </button>
-                </div>
-              </motion.div>
-            )}
-
-            {currentStep === 'summary' && (
-              <motion.div 
-                key="summary"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="bg-white p-12 rounded-2xl border border-[#1a1a1a]/5 shadow-sm text-center space-y-8"
-              >
-                <div className="flex justify-center">
-                  <div className="w-20 h-20 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                    <CheckCircle2 size={40} />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <h3 className="text-3xl font-serif">Check-out Complete</h3>
-                  <p className="text-sm text-[#1a1a1a]/60 font-light">Guest {reservation.guestName} has been successfully checked out from Room {reservation.roomNumber}.</p>
-                </div>
-
-                <div className="max-w-md mx-auto grid grid-cols-1 gap-4 text-left">
-                  <div className="p-6 bg-[#f8f9fa] rounded-2xl space-y-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] uppercase tracking-widest font-bold text-[#1a1a1a]/40">Invoice Number</span>
-                      <span className="text-sm font-medium">#INV-2026-0042</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] uppercase tracking-widest font-bold text-[#1a1a1a]/40">Payment Status</span>
-                      <span className="text-xs bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded font-bold uppercase">Paid in Full</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] uppercase tracking-widest font-bold text-[#1a1a1a]/40">Room Status</span>
-                      <span className="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded font-bold uppercase">Dirty - Pending HK</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
-                  <button 
-                    onClick={() => setEmailSent(true)}
-                    className={`w-full sm:w-auto px-8 py-3 rounded-xl text-xs font-medium uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${
-                      emailSent ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-white border border-[#1a1a1a]/10 hover:bg-[#f8f9fa]'
-                    }`}
-                  >
-                    {emailSent ? <Check size={14} /> : <Mail size={14} />}
-                    {emailSent ? 'Receipt Emailed' : 'Email Receipt'}
-                  </button>
-                  <button className="w-full sm:w-auto px-8 py-3 bg-white border border-[#1a1a1a]/10 rounded-xl text-xs font-medium uppercase tracking-widest hover:bg-[#f8f9fa] transition-colors flex items-center justify-center gap-2">
-                    <Printer size={14} /> Print Receipt
-                  </button>
-                  <button 
-                    onClick={handleFinish}
-                    className="w-full sm:w-auto px-8 py-3 bg-[#1a1a1a] text-white rounded-xl text-xs font-medium uppercase tracking-widest hover:bg-[#333] transition-colors"
-                  >
-                    Finish
-                  </button>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-        {/* Sidebar: Summary */}
-        <div className="space-y-8">
-          <div className="bg-[#f8f9fa] p-8 rounded-2xl border border-[#1a1a1a]/5 space-y-8">
-            <h4 className="text-[10px] uppercase tracking-widest font-bold text-[#1a1a1a]/40">Stay Details</h4>
-            
-            <div className="space-y-6">
-              <div className="flex items-start gap-4">
-                <div className="p-2 bg-white rounded-lg text-[#1a1a1a]/40">
-                  <User size={18} />
-                </div>
-                <div>
-                  <p className="text-sm font-medium">{reservation.guestName}</p>
-                  <p className="text-[10px] text-[#1a1a1a]/40 uppercase tracking-widest font-bold">Guest Name</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-4">
-                <div className="p-2 bg-white rounded-lg text-[#1a1a1a]/40">
-                  <Calendar size={18} />
-                </div>
-                <div>
-                  <p className="text-sm font-medium">{reservation.checkIn} - {reservation.checkOut}</p>
-                  <p className="text-[10px] text-[#1a1a1a]/40 uppercase tracking-widest font-bold">Stay Period</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-4">
-                <div className="p-2 bg-white rounded-lg text-[#1a1a1a]/40">
-                  <MapPin size={18} />
-                </div>
-                <div>
-                  <p className="text-sm font-medium">Room {reservation.roomNumber}</p>
-                  <p className="text-[10px] text-[#1a1a1a]/40 uppercase tracking-widest font-bold">{reservation.roomType}</p>
-                </div>
-              </div>
+      {/* Step 1: Invoice Review */}
+      {currentStep === 'invoice' && (
+        <div className="bg-white rounded-2xl border border-[#1a1a1a]/5 shadow-sm p-8 space-y-6">
+          <div className="flex items-center gap-3 pb-6 border-b border-[#1a1a1a]/5">
+            <div className="w-12 h-12 bg-[#f8f9fa] rounded-full flex items-center justify-center">
+              <Receipt size={24} className="text-[#1a1a1a]/60" />
             </div>
-
-            <div className="pt-8 border-t border-[#1a1a1a]/10 space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-xs text-[#1a1a1a]/60">Total Charges</span>
-                <span className="text-sm font-medium">${total.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-xs text-[#1a1a1a]/60">Payments Made</span>
-                <span className="text-sm font-medium">$0.00</span>
-              </div>
-              <div className="flex justify-between items-center pt-2 border-t border-[#1a1a1a]/5">
-                <span className="text-sm font-serif">Balance Due</span>
-                <span className="text-lg font-serif text-red-600">${total.toFixed(2)}</span>
-              </div>
+            <div>
+              <h2 className="text-lg font-medium">Invoice Review</h2>
+              <p className="text-sm text-[#1a1a1a]/60">Review all charges before payment</p>
             </div>
           </div>
 
-          <div className="p-6 bg-amber-50 rounded-2xl border border-amber-100 flex items-start gap-4">
-            <div className="p-2 bg-white rounded-lg text-amber-600">
-              <AlertCircle size={18} />
+          {/* Guest & Stay Info */}
+          <div className="grid grid-cols-2 gap-6">
+            <div className="p-4 bg-[#f8f9fa] rounded-xl">
+              <p className="text-[10px] uppercase tracking-widest text-[#1a1a1a]/40 mb-1">Guest</p>
+              <p className="font-medium">{reservation.firstName} {reservation.lastName}</p>
+              <p className="text-sm text-[#1a1a1a]/60">{reservation.email}</p>
+            </div>
+            <div className="p-4 bg-[#f8f9fa] rounded-xl">
+              <p className="text-[10px] uppercase tracking-widest text-[#1a1a1a]/40 mb-1">Stay Details</p>
+              <p className="font-medium">{nights} nights</p>
+              <p className="text-sm text-[#1a1a1a]/60">
+                Room {reservation.assignedRoomId}
+              </p>
+            </div>
+          </div>
+
+          {/* Invoice Items */}
+          <div className="space-y-3">
+            <div className="flex justify-between items-center p-3 bg-[#f8f9fa] rounded-lg">
+              <span className="text-sm">Room Charge ({nights} nights)</span>
+              <span className="font-medium">${roomCharge.toFixed(2)}</span>
+            </div>
+            
+            <div className="flex justify-between items-center p-3 border border-[#1a1a1a]/10 rounded-lg">
+              <div className="flex items-center gap-2">
+                <DollarSign size={16} className="text-[#1a1a1a]/40" />
+                <span className="text-sm">Additional Charges</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => setAdditionalCharges(Math.max(0, additionalCharges - 10))}
+                  className="p-1 hover:bg-[#f8f9fa] rounded"
+                >
+                  <Minus size={14} />
+                </button>
+                <span className="w-16 text-center font-medium">${additionalCharges.toFixed(2)}</span>
+                <button 
+                  onClick={() => setAdditionalCharges(additionalCharges + 10)}
+                  className="p-1 hover:bg-[#f8f9fa] rounded"
+                >
+                  <Plus size={14} />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex justify-between items-center p-3 bg-[#f8f9fa] rounded-lg">
+              <span className="text-sm">Taxes (10%)</span>
+              <span className="font-medium">${taxes.toFixed(2)}</span>
+            </div>
+          </div>
+
+          {/* Room Inspection */}
+          <div className="p-4 border border-[#1a1a1a]/10 rounded-xl space-y-3">
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id="roomInspected"
+                checked={roomInspected}
+                onChange={(e) => setRoomInspected(e.target.checked)}
+                className="w-5 h-5 rounded border-[#1a1a1a]/20"
+              />
+              <label htmlFor="roomInspected" className="text-sm font-medium">
+                Room has been inspected and is in good condition
+              </label>
+            </div>
+            {roomInspected && (
+              <textarea
+                value={inspectionNotes}
+                onChange={(e) => setInspectionNotes(e.target.value)}
+                rows={2}
+                className="w-full px-3 py-2 bg-[#f8f9fa] border border-[#1a1a1a]/5 rounded-lg text-sm"
+                placeholder="Inspection notes (optional)..."
+              />
+            )}
+          </div>
+
+          {/* Total */}
+          <div className="p-6 bg-[#1a1a1a] text-white rounded-xl">
+            <div className="flex justify-between items-center">
+              <span className="font-medium">Total Amount Due</span>
+              <span className="text-2xl font-serif">${total.toFixed(2)}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Step 2: Payment */}
+      {currentStep === 'payment' && (
+        <div className="bg-white rounded-2xl border border-[#1a1a1a]/5 shadow-sm p-8 space-y-6">
+          <div className="flex items-center gap-3 pb-6 border-b border-[#1a1a1a]/5">
+            <div className="w-12 h-12 bg-[#f8f9fa] rounded-full flex items-center justify-center">
+              <CreditCard size={24} className="text-[#1a1a1a]/60" />
             </div>
             <div>
-              <p className="text-xs font-medium text-amber-900">Checkout Note</p>
-              <p className="text-[10px] text-amber-700/60 leading-relaxed mt-1">
-                Guest mentioned a minor issue with the shower pressure in Room {reservation.roomNumber}. Maintenance notified.
+              <h2 className="text-lg font-medium">Payment</h2>
+              <p className="text-sm text-[#1a1a1a]/60">Select payment method and process payment</p>
+            </div>
+          </div>
+
+          {/* Payment Summary */}
+          <div className="p-4 bg-[#f8f9fa] rounded-xl">
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-[#1a1a1a]/60">Total Amount Due</span>
+              <span className="text-xl font-serif font-medium">${total.toFixed(2)}</span>
+            </div>
+          </div>
+
+          {/* Payment Methods */}
+          <div className="space-y-3">
+            <p className="text-sm font-medium">Select Payment Method</p>
+            {[
+              { id: 'card', label: 'Credit/Debit Card', icon: CreditCard },
+              { id: 'cash', label: 'Cash', icon: DollarSign },
+              { id: 'transfer', label: 'Bank Transfer', icon: ShieldCheck },
+            ].map((method) => (
+              <button
+                key={method.id}
+                onClick={() => setPaymentMethod(method.id as any)}
+                className={`w-full flex items-center gap-4 p-4 border rounded-xl transition-all ${
+                  paymentMethod === method.id 
+                    ? 'border-[#1a1a1a] bg-[#1a1a1a]/5' 
+                    : 'border-[#1a1a1a]/10 hover:border-[#1a1a1a]/30'
+                }`}
+              >
+                <method.icon size={20} className={paymentMethod === method.id ? 'text-[#1a1a1a]' : 'text-[#1a1a1a]/40'} />
+                <span className="font-medium">{method.label}</span>
+                {paymentMethod === method.id && <Check size={18} className="ml-auto text-emerald-600" />}
+              </button>
+            ))}
+          </div>
+
+          {/* Notes */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Notes (Optional)</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={3}
+              className="w-full px-4 py-2 bg-[#f8f9fa] border border-[#1a1a1a]/5 rounded-xl text-sm"
+              placeholder="Any additional notes..."
+            />
+          </div>
+
+          {/* Process Payment Button */}
+          <button
+            onClick={handleNext}
+            disabled={checkoutMutation.isPending}
+            className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+          >
+            {checkoutMutation.isPending ? (
+              <>
+                <Loader2 size={18} className="animate-spin" />
+                Processing Payment...
+              </>
+            ) : (
+              <>
+                <CheckCircle2 size={18} />
+                Complete Payment & Check-out
+              </>
+            )}
+          </button>
+        </div>
+      )}
+
+      {/* Step 3: Summary */}
+      {currentStep === 'summary' && (
+        <div className="bg-white rounded-2xl border border-[#1a1a1a]/5 shadow-sm p-8 space-y-6">
+          <div className="text-center py-8">
+            <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <CheckCircle2 size={40} className="text-emerald-600" />
+            </div>
+            <h2 className="text-2xl font-serif font-light mb-2">Check-out Complete!</h2>
+            <p className="text-[#1a1a1a]/60 mb-8">Guest has been successfully checked out</p>
+            
+            <div className="inline-block p-6 bg-[#f8f9fa] rounded-xl text-left">
+              <p className="text-sm text-[#1a1a1a]/60 mb-2">Checkout Details</p>
+              <p className="font-medium">{reservation.firstName} {reservation.lastName}</p>
+              <p className="text-sm">Room {reservation.assignedRoomId}</p>
+              <p className="text-sm">Total Paid: ${total.toFixed(2)}</p>
+              <p className="text-sm text-[#1a1a1a]/60">
+                {format(new Date(), 'MMM dd, yyyy HH:mm')}
               </p>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Footer Actions */}
+      <div className="flex justify-between">
+        <button
+          onClick={() => {
+            if (currentStep === 'invoice') navigate('/checkout');
+            else if (currentStep === 'payment') setCurrentStep('invoice');
+            else navigate('/checkout');
+          }}
+          className="px-6 py-3 text-sm font-medium text-[#1a1a1a]/60 hover:text-[#1a1a1a]"
+        >
+          {currentStep === 'summary' ? 'Back to Dashboard' : 'Back'}
+        </button>
+
+        {currentStep !== 'summary' && (
+          <button
+            onClick={handleNext}
+            disabled={!canProceed() || checkoutMutation.isPending}
+            className="flex items-center gap-2 px-6 py-3 bg-[#1a1a1a] text-white rounded-xl text-sm font-medium hover:bg-[#333] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {currentStep === 'payment' ? 'Complete Check-out' : 'Continue'}
+            <ArrowRight size={16} />
+          </button>
+        )}
+
+        {currentStep === 'summary' && (
+          <button
+            onClick={() => navigate('/checkout')}
+            className="flex items-center gap-2 px-6 py-3 bg-[#1a1a1a] text-white rounded-xl text-sm font-medium hover:bg-[#333]"
+          >
+            Back to Dashboard
+          </button>
+        )}
       </div>
     </div>
-  );
-}
-
-function DollarSign({ size, className }: { size: number, className?: string }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <line x1="12" y1="1" x2="12" y2="23"></line>
-      <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-    </svg>
-  );
-}
-
-function Globe({ size, className }: { size: number, className?: string }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <circle cx="12" cy="12" r="10"></circle>
-      <line x1="2" y1="12" x2="22" y2="12"></line>
-      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
-    </svg>
   );
 }

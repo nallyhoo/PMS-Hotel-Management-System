@@ -16,6 +16,7 @@ import Pagination from '../../components/Pagination';
 
 interface ReservationUI {
   id: string;
+  reservationId: number;
   guestName: string;
   roomType: string;
   roomNumber?: string;
@@ -40,6 +41,7 @@ export default function BookingListPage() {
     if (!data?.data) return [];
     return data.data.map((res) => ({
       id: res.reservationCode || String(res.reservationId),
+      reservationId: res.reservationId,
       guestName: res.firstName && res.lastName ? `${res.firstName} ${res.lastName}` : `Guest ${res.guestId}`,
       roomType: res.roomTypeName || 'Standard',
       roomNumber: res.assignedRoomId ? String(res.assignedRoomId) : undefined,
@@ -226,7 +228,7 @@ export default function BookingListPage() {
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <button 
-                        onClick={() => navigate(`/reservations/details/${res.id}`)}
+                        onClick={() => navigate(`/reservations/details/${res.reservationId}`)}
                         className="p-2 hover:bg-[#1a1a1a]/5 rounded-lg transition-colors text-[#1a1a1a]/60" 
                         title="View Details"
                       >

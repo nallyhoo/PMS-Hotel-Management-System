@@ -82,6 +82,59 @@ router.get('/', (req: Request, res: Response) => {
   }
 });
 
+// Calendar View
+router.get('/calendar', (req: Request, res: Response) => {
+  try {
+    const { startDate, endDate, page = 1, limit = 100 } = req.query;
+    const offset = (Number(page) - 1) * Number(limit);
+    
+    const reservations = db.prepare(`
+      SELECT r.ReservationID, r.ReservationCode, r.CheckInDate, r.CheckOutDate, r.Status,
+             r.AssignedRoomID, r.BookingSource, r.TotalAmount, r.Adults, r.Children,
+             g.FirstName, g.LastName, rt.TypeName as RoomTypeName,
+             rm.RoomNumber
+      FROM Reservations r
+      LEFT JOIN Guests g ON r.GuestID = g.GuestID
+      LEFT JOIN Rooms rm ON r.AssignedRoomID = rm.RoomID
+      LEFT JOIN RoomTypes rt ON rm.RoomTypeID = rt.RoomTypeID
+      WHERE r.CheckInDate <= ? AND r.CheckOutDate >= ?
+      ORDER BY r.CheckInDate
+      LIMIT ? OFFSET ?
+    `).all(endDate, startDate, Number(limit), offset);
+    
+    const countResult = db.prepare(`
+      SELECT COUNT(*) as total FROM Reservations
+      WHERE CheckInDate <= ? AND CheckOutDate >= ?
+    `).get(endDate, startDate) as any;
+    
+    const transformedReservations = reservations.map((res: any) => ({
+      reservationId: res.ReservationID,
+      reservationCode: res.ReservationCode,
+      checkInDate: res.CheckInDate,
+      checkOutDate: res.CheckOutDate,
+      status: res.Status,
+      assignedRoomId: res.AssignedRoomID,
+      bookingSource: res.BookingSource,
+      totalAmount: res.TotalAmount,
+      adults: res.Adults,
+      children: res.Children,
+      guestName: res.FirstName && res.LastName ? `${res.FirstName} ${res.LastName}` : 'Guest',
+      roomTypeName: res.RoomTypeName,
+      roomNumber: res.RoomNumber
+    }));
+    
+    res.json({
+      data: transformedReservations,
+      total: countResult.total,
+      page: Number(page),
+      limit: Number(limit),
+      totalPages: Math.ceil(countResult.total / Number(limit))
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch calendar' });
+  }
+});
+
 // Get reservation by ID
 router.get('/:id', (req: Request, res: Response) => {
   try {
@@ -107,7 +160,37 @@ router.get('/:id', (req: Request, res: Response) => {
     const notes = db.prepare('SELECT * FROM ReservationNotes WHERE ReservationID = ?').all(req.params.id);
     const history = db.prepare('SELECT * FROM ReservationHistory WHERE ReservationID = ? ORDER BY ActionDate DESC').all(req.params.id);
 
-    res.json({ ...reservation, rooms, notes, history });
+    const transformedReservation = {
+      reservationId: reservation.ReservationID,
+      guestId: reservation.GuestID,
+      branchId: reservation.BranchID,
+      reservationCode: reservation.ReservationCode,
+      checkInDate: reservation.CheckInDate,
+      checkOutDate: reservation.CheckOutDate,
+      status: reservation.Status,
+      bookingSource: reservation.BookingSource,
+      adults: reservation.Adults,
+      children: reservation.Children,
+      specialRequests: reservation.SpecialRequests,
+      totalAmount: reservation.TotalAmount,
+      depositAmount: reservation.DepositAmount,
+      depositPaid: reservation.DepositPaid === 1,
+      assignedRoomId: reservation.AssignedRoomID,
+      confirmationDate: reservation.ConfirmationDate,
+      cancelledDate: reservation.CancelledDate,
+      cancelledBy: reservation.CancelledBy,
+      cancellationReason: reservation.CancellationReason,
+      createdBy: reservation.CreatedBy,
+      createdDate: reservation.CreatedDate,
+      updatedDate: reservation.UpdatedDate,
+      firstName: reservation.FirstName,
+      lastName: reservation.LastName,
+      email: reservation.Email,
+      phone: reservation.Phone,
+      nationality: reservation.Nationality,
+    };
+
+    res.json({ ...transformedReservation, rooms, notes, history });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch reservation' });
   }
@@ -228,27 +311,33 @@ router.post('/:id/checkin', (req: Request, res: Response) => {
 router.post('/:id/checkout', (req: Request, res: Response) => {
   try {
     const { totalBill, paymentStatus, roomInspected, inspectionNotes, notes } = req.body;
+    const reservationId = req.params.id;
 
-    db.prepare(`
-      INSERT INTO CheckOuts (ReservationID, RoomID, CheckOutDate, TotalBill, PaymentStatus, RoomInspected, InspectionNotes, Notes)
-      SELECT ?, RoomID, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?
-      FROM Reservations WHERE ReservationID = ?
-    `).run(req.params.id, totalBill, paymentStatus, roomInspected ? 1 : 0, inspectionNotes, notes, req.params.id);
-
-    db.prepare(`UPDATE Reservations SET Status = 'Checked Out' WHERE ReservationID = ?`).run(req.params.id);
-
-    const roomId = (db.prepare('SELECT RoomID FROM Reservations WHERE ReservationID = ?').get(req.params.id) as any)?.RoomID;
-    if (roomId) {
-      db.prepare(`UPDATE Rooms SET Status = 'Dirty', CleaningStatus = 'Dirty' WHERE RoomID = ?`).run(roomId);
+    const reservation = db.prepare('SELECT AssignedRoomID, Status FROM Reservations WHERE ReservationID = ?').get(reservationId) as any;
+    
+    if (!reservation) {
+      return res.status(404).json({ error: 'Reservation not found' });
     }
+
+    if (reservation.AssignedRoomID) {
+      db.prepare(`
+        INSERT INTO CheckOuts (ReservationID, RoomID, CheckOutDate, TotalBill, PaymentStatus, RoomInspected, InspectionNotes, Notes)
+        VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?)
+      `).run(reservationId, reservation.AssignedRoomID, totalBill, paymentStatus, roomInspected ? 1 : 0, inspectionNotes, notes);
+
+      db.prepare(`UPDATE Rooms SET Status = 'Dirty', CleaningStatus = 'Dirty' WHERE RoomID = ?`).run(reservation.AssignedRoomID);
+    }
+
+    db.prepare(`UPDATE Reservations SET Status = 'Checked Out' WHERE ReservationID = ?`).run(reservationId);
 
     db.prepare(`
       INSERT INTO ReservationHistory (ReservationID, Action, NewStatus, Notes)
       VALUES (?, 'Checked Out', 'Checked Out', 'Guest checked out')
-    `).run(req.params.id);
+    `).run(reservationId);
 
     res.json({ message: 'Check-out successful' });
   } catch (error) {
+    console.error('Checkout error:', error);
     res.status(500).json({ error: 'Failed to check out' });
   }
 });
@@ -274,26 +363,6 @@ router.post('/:id/notes', (req: Request, res: Response) => {
     res.status(201).json({ noteId: result.lastInsertRowid });
   } catch (error) {
     res.status(500).json({ error: 'Failed to add note' });
-  }
-});
-
-// Calendar View
-router.get('/calendar', (req: Request, res: Response) => {
-  try {
-    const { startDate, endDate } = req.query;
-    
-    const reservations = db.prepare(`
-      SELECT r.ReservationID, r.ReservationCode, r.CheckInDate, r.CheckOutDate, r.Status,
-             g.FirstName, g.LastName, r.TotalAmount
-      FROM Reservations r
-      LEFT JOIN Guests g ON r.GuestID = g.GuestID
-      WHERE r.CheckInDate <= ? AND r.CheckOutDate >= ?
-      ORDER BY r.CheckInDate
-    `).all(endDate, startDate);
-    
-    res.json(reservations);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch calendar' });
   }
 });
 

@@ -163,6 +163,7 @@ export default function App() {
 
         <Route path="/reservations/list" element={<DashboardLayout><BookingListPage /></DashboardLayout>} />
         <Route path="/reservations/create" element={<DashboardLayout><CreateReservationPage /></DashboardLayout>} />
+        <Route path="/reservations/edit/:id" element={<DashboardLayout><CreateReservationPage isEdit /></DashboardLayout>} />
         <Route path="/reservations/calendar" element={<DashboardLayout><ReservationCalendarPage /></DashboardLayout>} />
         <Route path="/reservations/timeline" element={<DashboardLayout><BookingTimelinePage /></DashboardLayout>} />
         <Route path="/reservations/sources" element={<DashboardLayout><BookingSourceAnalyticsPage /></DashboardLayout>} />

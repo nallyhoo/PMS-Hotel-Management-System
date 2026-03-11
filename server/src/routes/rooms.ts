@@ -124,22 +124,43 @@ router.get('/availability/check', (req: Request, res: Response) => {
   try {
     const { checkIn, checkOut, roomTypeId, guests } = req.query;
 
-    const availableRooms = db.prepare(`
+    let query = `
       SELECT r.*, rt.TypeName, rt.BasePrice, rt.Capacity
       FROM Rooms r
       JOIN RoomTypes rt ON r.RoomTypeID = rt.RoomTypeID
-      WHERE r.Status = 'Available'
-      ${roomTypeId ? 'AND r.RoomTypeID = ?' : ''}
-      AND r.RoomID NOT IN (
-        SELECT RoomID FROM Reservations
-        WHERE Status IN ('Confirmed', 'Checked In')
-        AND CheckInDate < ?
-        AND CheckOutDate > ?
-      )
-      ORDER BY r.RoomNumber
-    `).all(checkOut, checkIn, roomTypeId || null);
+      WHERE 1=1
+    `;
+    const params: any[] = [];
 
-    res.json(availableRooms);
+    if (roomTypeId) {
+      query += ' AND r.RoomTypeID = ?';
+      params.push(roomTypeId);
+    }
+
+    query += ` AND r.RoomID NOT IN (
+      SELECT AssignedRoomID FROM Reservations
+      WHERE Status IN ('Confirmed', 'Checked In')
+      AND AssignedRoomID IS NOT NULL
+      AND CheckInDate < ?
+      AND CheckOutDate > ?
+    ) ORDER BY r.RoomNumber`;
+
+    params.push(checkOut, checkIn);
+    const availableRooms = db.prepare(query).all(...params);
+
+    const transformedRooms = availableRooms.map((room: any) => ({
+      roomId: room.RoomID,
+      roomNumber: room.RoomNumber,
+      roomTypeId: room.RoomTypeID,
+      typeName: room.TypeName,
+      basePrice: room.BasePrice,
+      capacity: room.Capacity,
+      status: room.Status,
+      floorId: room.FloorID,
+      branchId: room.BranchID
+    }));
+
+    res.json(transformedRooms);
   } catch (error) {
     res.status(500).json({ error: 'Failed to check availability' });
   }
