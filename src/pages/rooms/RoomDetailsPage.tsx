@@ -199,7 +199,7 @@ export default function RoomDetailsPage() {
                 <div className="space-y-4">
                   <h3 className="text-sm font-serif">Quick Description</h3>
                   <p className="text-sm text-[#1a1a1a]/60 font-light leading-relaxed">
-                    {roomDescription || `This ${roomTypeName?.toLowerCase() || 'room'} on the ${floorNumber?.toLowerCase() || 'floor'} offers a premium experience with modern amenities.`}
+                    {roomDescription || `This ${roomTypeName?.toLowerCase() || 'room'} on the ${floorNumber ? String(floorNumber) + ' floor' : 'floor'} offers a premium experience with modern amenities.`}
                   </p>
                 </div>
               </div>

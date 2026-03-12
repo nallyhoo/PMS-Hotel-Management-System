@@ -10,10 +10,11 @@ import {
   AlertTriangle,
   X
 } from 'lucide-react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import roomService from '../../api/rooms';
 import { useNavigate } from 'react-router-dom';
 import Pagination from '../../components/Pagination';
+import { useToastMutation } from '../../lib/useToastMutation';
 
 interface RoomTypeWithImages {
   roomTypeId: number;
@@ -61,8 +62,10 @@ export default function RoomTypeListPage() {
 
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
 
-  const deleteMutation = useMutation({
+  const deleteMutation = useToastMutation({
     mutationFn: (id: number) => roomService.deleteRoomType(id),
+    successMessage: 'Room type deleted successfully',
+    errorMessage: 'Failed to delete room type',
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['roomTypes'] });
       setDeleteConfirm(null);

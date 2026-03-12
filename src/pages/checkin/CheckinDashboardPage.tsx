@@ -132,10 +132,16 @@ export default function CheckinDashboardPage() {
               >
                 Walk-in Reservation <Plus size={14} />
               </button>
-              <button className="w-full py-3 px-4 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-medium uppercase tracking-widest transition-colors text-left flex items-center justify-between">
+              <button 
+                onClick={() => navigate('/checkin/group')}
+                className="w-full py-3 px-4 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-medium uppercase tracking-widest transition-colors text-left flex items-center justify-between"
+              >
                 Group Check-in <Users size={14} />
               </button>
-              <button className="w-full py-3 px-4 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-medium uppercase tracking-widest transition-colors text-left flex items-center justify-between">
+              <button 
+                onClick={() => navigate('/checkin/keycards')}
+                className="w-full py-3 px-4 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-medium uppercase tracking-widest transition-colors text-left flex items-center justify-between"
+              >
                 Key Card Management <LayoutGrid size={14} />
               </button>
             </div>

@@ -35,8 +35,8 @@ export function initDatabase() {
 }
 
 export function seedDatabase() {
-  // Check if already seeded
-  const roomTypeCount = db.prepare('SELECT COUNT(*) as count FROM RoomTypes').get() as { count: number };
+  // Check if already seeded (only count active room types)
+  const roomTypeCount = db.prepare('SELECT COUNT(*) as count FROM RoomTypes WHERE IsActive = 1').get() as { count: number };
   if (roomTypeCount.count > 0) {
     console.log('Database already seeded');
     return;

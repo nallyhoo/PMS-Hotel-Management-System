@@ -154,48 +154,64 @@ CREATE TABLE Guests (
     BlacklistReason TEXT,
     MarketingConsent BOOLEAN DEFAULT 0,
     Notes TEXT,
+    IsActive BOOLEAN DEFAULT 1,
     CreatedDate DATETIME DEFAULT CURRENT_TIMESTAMP,
     UpdatedDate DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE GuestDocuments (
-    DocumentID INTEGER PRIMARY KEY AUTOINCREMENT,
+-- Guest Notes
+CREATE TABLE GuestNotes (
+    NoteID INTEGER PRIMARY KEY AUTOINCREMENT,
     GuestID INTEGER NOT NULL,
-    DocumentType TEXT NOT NULL CHECK(DocumentType IN ('Passport', 'ID Card', 'Driver License', 'Visa', 'Other')),
-    DocumentNumber TEXT,
-    IssueDate DATE,
-    ExpiryDate DATE,
-    ImageURL TEXT,
+    NoteType TEXT DEFAULT 'General' CHECK(NoteType IN ('General', 'Preference', 'Complaint', 'Compliment', 'Internal')),
+    NoteContent TEXT NOT NULL,
+    CreatedBy INTEGER,
     CreatedDate DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UpdatedDate DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (GuestID) REFERENCES Guests(GuestID)
 );
 
+-- Guest Preferences
 CREATE TABLE GuestPreferences (
     PreferenceID INTEGER PRIMARY KEY AUTOINCREMENT,
     GuestID INTEGER NOT NULL,
     PreferenceType TEXT NOT NULL,
     PreferenceValue TEXT,
     Notes TEXT,
-    FOREIGN KEY (GuestID) REFERENCES Guests(GuestID),
-    UNIQUE(GuestID, PreferenceType)
-);
-
-CREATE TABLE GuestLoyalty (
-    LoyaltyID INTEGER PRIMARY KEY AUTOINCREMENT,
-    GuestID INTEGER NOT NULL UNIQUE,
-    Points INTEGER DEFAULT 0,
-    TierLevel TEXT DEFAULT 'Bronze' CHECK(TierLevel IN ('Bronze', 'Silver', 'Gold', 'Platinum')),
-    TotalPointsEarned INTEGER DEFAULT 0,
-    TotalPointsRedeemed INTEGER DEFAULT 0,
-    MembershipStartDate DATE DEFAULT CURRENT_DATE,
     CreatedDate DATETIME DEFAULT CURRENT_TIMESTAMP,
     UpdatedDate DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (GuestID) REFERENCES Guests(GuestID)
 );
 
--- ============================================================
--- 4. RESERVATION SYSTEM
--- ============================================================
+-- Guest Loyalty
+CREATE TABLE GuestLoyalty (
+    LoyaltyID INTEGER PRIMARY KEY AUTOINCREMENT,
+    GuestID INTEGER NOT NULL UNIQUE,
+    PointsBalance INTEGER DEFAULT 0,
+    LifetimePoints INTEGER DEFAULT 0,
+    TierLevel TEXT DEFAULT 'Bronze' CHECK(TierLevel IN ('Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond')),
+    PointsExpiring INTEGER DEFAULT 0,
+    ExpiryDate DATE,
+    EnrollmentDate DATE DEFAULT (DATE('now')),
+    LastActivityDate DATE,
+    CreatedDate DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UpdatedDate DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (GuestID) REFERENCES Guests(GuestID)
+);
+
+-- Guest Documents
+CREATE TABLE GuestDocuments (
+    DocumentID INTEGER PRIMARY KEY AUTOINCREMENT,
+    GuestID INTEGER NOT NULL,
+    DocumentType TEXT NOT NULL,
+    DocumentNumber TEXT,
+    ImageURL TEXT,
+    IssueDate DATE,
+    ExpiryDate DATE,
+    IsVerified BOOLEAN DEFAULT 0,
+    CreatedDate DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (GuestID) REFERENCES Guests(GuestID)
+);
 
 CREATE TABLE Reservations (
     ReservationID INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -309,6 +325,23 @@ CREATE TABLE CheckOuts (
     CreatedDate DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (ReservationID) REFERENCES Reservations(ReservationID),
     FOREIGN KEY (RoomID) REFERENCES Rooms(RoomID)
+);
+
+-- Key Cards Management
+CREATE TABLE KeyCards (
+    KeyCardID INTEGER PRIMARY KEY AUTOINCREMENT,
+    CardNumber TEXT NOT NULL UNIQUE,
+    RoomID INTEGER NOT NULL,
+    GuestName TEXT,
+    ReservationID INTEGER,
+    Status TEXT DEFAULT 'Active' CHECK(Status IN ('Active', 'Inactive', 'Lost', 'Returned')),
+    IssueDate DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ExpiryDate DATETIME,
+    ReturnDate DATETIME,
+    CreatedBy INTEGER,
+    Notes TEXT,
+    FOREIGN KEY (RoomID) REFERENCES Rooms(RoomID),
+    FOREIGN KEY (ReservationID) REFERENCES Reservations(ReservationID)
 );
 
 -- ============================================================

@@ -18,12 +18,15 @@ import {
   Loader2,
   DollarSign,
   Plus,
-  Minus
+  Minus,
+  Key
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import reservationService from '../../api/reservations';
+import keyCardService from '../../api/keycards';
 import { format, differenceInDays } from 'date-fns';
+import { toastSuccess, toastError } from '../../lib/toast';
 
 type Step = 'invoice' | 'payment' | 'summary';
 
@@ -38,12 +41,14 @@ interface InvoiceItem {
 export default function CheckoutProcessPage() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const queryClient = useQueryClient();
   const [currentStep, setCurrentStep] = useState<Step>('invoice');
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'cash' | 'transfer'>('card');
   const [roomInspected, setRoomInspected] = useState(false);
   const [inspectionNotes, setInspectionNotes] = useState('');
   const [additionalCharges, setAdditionalCharges] = useState(0);
   const [notes, setNotes] = useState('');
+  const [keyCardReturned, setKeyCardReturned] = useState(false);
 
   const { data: reservation, isLoading, error } = useQuery({
     queryKey: ['reservation', id],
@@ -51,11 +56,34 @@ export default function CheckoutProcessPage() {
     enabled: !!id,
   });
 
+  // Fetch key cards for the room
+  const { data: keyCards } = useQuery({
+    queryKey: ['keyCards', reservation?.assignedRoomId],
+    queryFn: () => keyCardService.getKeyCardsByRoom(reservation?.assignedRoomId),
+    enabled: !!reservation?.assignedRoomId,
+  });
+
+  const activeKeyCard = keyCards?.find((kc: any) => kc.status === 'Active');
+
   const checkoutMutation = useMutation({
-    mutationFn: (data: { totalBill: number; paymentStatus: string; roomInspected: boolean; inspectionNotes?: string; notes?: string }) => 
-      reservationService.checkOut(Number(id), data),
+    mutationFn: async (data: { totalBill: number; paymentStatus: string; roomInspected: boolean; inspectionNotes?: string; notes?: string }) => {
+      await reservationService.checkOut(Number(id), data);
+      
+      // Return key card if exists and not already returned
+      if (activeKeyCard && !keyCardReturned) {
+        try {
+          await keyCardService.returnKeyCard(activeKeyCard.keyCardId);
+        } catch (e) {
+          // Ignore key card return errors
+        }
+      }
+    },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['keycards'] });
       setCurrentStep('summary');
+    },
+    onError: (err: any) => {
+      toastError(err.message || 'Checkout failed');
     },
   });
 
@@ -240,6 +268,33 @@ export default function CheckoutProcessPage() {
             )}
           </div>
 
+          {/* Key Card Return */}
+          {activeKeyCard && (
+            <div className="p-4 border border-emerald-200 bg-emerald-50 rounded-xl space-y-3">
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="keyCardReturned"
+                  checked={keyCardReturned}
+                  onChange={(e) => setKeyCardReturned(e.target.checked)}
+                  className="w-5 h-5 rounded border-[#1a1a1a]/20"
+                />
+                <label htmlFor="keyCardReturned" className="text-sm font-medium flex items-center gap-2">
+                  <Key size={16} className="text-emerald-600" />
+                  Collect Room Key Card
+                </label>
+              </div>
+              {keyCardReturned && (
+                <div className="p-2 bg-white rounded-lg text-sm text-emerald-700">
+                  Key card <span className="font-mono font-medium">{activeKeyCard.cardNumber}</span> will be marked as returned
+                </div>
+              )}
+              {!keyCardReturned && (
+                <p className="text-xs text-emerald-600">Key card {activeKeyCard.cardNumber} will remain active</p>
+              )}
+            </div>
+          )}
+
           {/* Total */}
           <div className="p-6 bg-[#1a1a1a] text-white rounded-xl">
             <div className="flex justify-between items-center">
@@ -347,6 +402,76 @@ export default function CheckoutProcessPage() {
                 {format(new Date(), 'MMM dd, yyyy HH:mm')}
               </p>
             </div>
+          </div>
+
+          {/* Print Invoice Button */}
+          <div className="flex justify-center gap-4">
+            <button
+              onClick={() => window.print()}
+              className="flex items-center gap-2 px-6 py-3 bg-[#1a1a1a] text-white rounded-xl text-sm font-medium hover:bg-[#333] transition-colors"
+            >
+              <Printer size={18} />
+              Print Invoice
+            </button>
+            <button
+              onClick={() => {
+                // Generate and download invoice as text
+                const invoiceText = `
+=====================================
+         HOTEL INVOICE
+=====================================
+
+Invoice Number: INV-${reservation.reservationId}-${Date.now()}
+Date: ${format(new Date(), 'MMMM dd, yyyy')}
+
+-------------------------------------
+GUEST DETAILS
+-------------------------------------
+Name: ${reservation.firstName} {reservation.lastName}
+Email: ${reservation.email}
+Phone: ${reservation.phone}
+
+-------------------------------------
+STAY DETAILS
+-------------------------------------
+Reservation: ${reservation.reservationCode}
+Check-in: ${reservation.checkInDate}
+Check-out: ${reservation.checkOutDate}
+Nights: ${nights}
+Room: ${reservation.assignedRoomId}
+
+-------------------------------------
+CHARGES
+-------------------------------------
+Room Charge (${nights} nights): $${(reservation.totalAmount || 0).toFixed(2)}
+Additional Charges: $${additionalCharges.toFixed(2)}
+Taxes (10%): $${taxes.toFixed(2)}
+
+-------------------------------------
+TOTAL
+-------------------------------------
+Total Amount: $${total.toFixed(2)}
+Deposit Paid: $${(reservation.depositAmount || 0).toFixed(2)}
+Balance Due: $${Math.max(0, total - (reservation.depositAmount || 0)).toFixed(2)}
+
+=====================================
+     THANK YOU FOR STAYING!
+=====================================
+                `;
+                
+                const blob = new Blob([invoiceText], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Invoice-${reservation.reservationCode}.txt`;
+                a.click();
+                URL.revokeObjectURL(url);
+              }}
+              className="flex items-center gap-2 px-6 py-3 border border-[#1a1a1a]/10 rounded-xl text-sm font-medium hover:bg-[#f8f9fa] transition-colors"
+            >
+              <Receipt size={18} />
+              Download Invoice
+            </button>
           </div>
         </div>
       )}

@@ -482,3 +482,13 @@ Approximate number of endpoints in this design:
 Total: **~145 API endpoints**
 
 ---
+
+# API Routes: Created server/src/routes/keycards.ts with endpoints:                                                                                          
+       - GET /api/keycards - List all key cards                                                                                                                   
+       - GET /api/keycards/active - Get active key cards                                                                                                          
+       - POST /api/keycards - Create new key card                                                                                                                 
+       - PUT /api/keycards/:id - Update key card                                                                                                                  
+       - POST /api/keycards/:id/return - Return key card                                                                                                          
+       - POST /api/keycards/:id/lost - Mark as lost                                                                                                                     
+       - POST /api/keycards/:id/deactivate - Deactivate card                                                                                                            
+       - DELETE /api/keycards/:id - Delete key card 

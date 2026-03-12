@@ -8,9 +8,10 @@ import {
   Pencil,
   Trash2
 } from 'lucide-react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import roomService from '../../api/rooms';
 import { useNavigate } from 'react-router-dom';
+import { useToastMutation } from '../../lib/useToastMutation';
 
 interface FloorData {
   floorId: number;
@@ -81,8 +82,10 @@ export default function FloorManagementPage() {
     return Array.from(floorMap.values()).sort((a, b) => a.floorNumber - b.floorNumber);
   }, [floors, rooms]);
 
-  const deleteMutation = useMutation({
+  const deleteMutation = useToastMutation({
     mutationFn: (id: number) => roomService.deleteFloor(id),
+    successMessage: 'Floor deleted successfully',
+    errorMessage: 'Failed to delete floor',
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['floors'] });
       setDeleteFloor(null);
@@ -256,7 +259,7 @@ function FloorModal({ floor, onClose }: { floor?: FloorData; onClose: () => void
 
   const isEdit = !!floor;
 
-  const mutation = useMutation({
+  const mutation = useToastMutation({
     mutationFn: async (data: { floorNumber: number; floorName: string; description?: string }) => {
       if (isEdit) {
         await roomService.updateFloor(floor.floorId, data);
@@ -264,6 +267,8 @@ function FloorModal({ floor, onClose }: { floor?: FloorData; onClose: () => void
         await roomService.createFloor(data);
       }
     },
+    successMessage: isEdit ? 'Floor updated successfully' : 'Floor created successfully',
+    errorMessage: 'Failed to save floor',
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['floors'] });
       onClose();

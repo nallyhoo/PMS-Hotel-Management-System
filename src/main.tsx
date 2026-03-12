@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
 import { AuthProvider } from './context/AuthContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import App from './App.tsx';
+import App from './App';
 import './index.css';
 
 const queryClient = new QueryClient({
@@ -23,7 +23,18 @@ createRoot(document.getElementById('root')!).render(
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <App />
-          <Toaster position="top-right" richColors />
+          <Toaster 
+            position="top-right" 
+            richColors 
+            expand 
+            toastOptions={{
+              style: {
+                background: 'white',
+                border: '1px solid rgba(0,0,0,0.1)',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+              },
+            }}
+          />
         </AuthProvider>
       </QueryClientProvider>
     </ErrorBoundary>

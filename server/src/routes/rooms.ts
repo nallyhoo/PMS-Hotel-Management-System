@@ -230,28 +230,77 @@ router.get('/types/:id', (req: Request, res: Response) => {
 router.post('/types', (req: Request, res: Response) => {
   try {
     const { typeName, description, capacity, basePrice, maxOccupancy, bedType, sizeSqFt } = req.body;
+    
+    // Validate required fields
+    if (!typeName || !typeName.trim()) {
+      res.status(400).json({ error: 'Room type name is required' });
+      return;
+    }
+
+    // Check for duplicate name (including inactive - to prevent unique constraint violations)
+    const existing = db.prepare('SELECT RoomTypeID, IsActive FROM RoomTypes WHERE TypeName = ?').get(typeName) as { RoomTypeID: number; IsActive: number } | undefined;
+    if (existing) {
+      if (existing.IsActive === 1) {
+        res.status(400).json({ error: 'A room type with this name already exists' });
+        return;
+      } else {
+        // Reactivate the soft-deleted room type instead of creating new
+        db.prepare(`
+          UPDATE RoomTypes SET IsActive = 1, Description = ?, Capacity = ?, BasePrice = ?, MaxOccupancy = ?, BedType = ?, SizeSqFt = ?, UpdatedDate = CURRENT_TIMESTAMP
+          WHERE RoomTypeID = ?
+        `).run(description, capacity, basePrice, maxOccupancy, bedType, sizeSqFt, existing.RoomTypeID);
+        
+        res.status(201).json({ roomTypeId: existing.RoomTypeID });
+        return;
+      }
+    }
+
     const result = db.prepare(`
       INSERT INTO RoomTypes (TypeName, Description, Capacity, BasePrice, MaxOccupancy, BedType, SizeSqFt)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(typeName, description, capacity, basePrice, maxOccupancy, bedType, sizeSqFt);
     
     res.status(201).json({ roomTypeId: result.lastInsertRowid });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to create room type' });
+  } catch (error: any) {
+    console.error('Error creating room type:', error);
+    if (error.message?.includes('UNIQUE constraint failed')) {
+      res.status(400).json({ error: 'A room type with this name already exists' });
+    } else {
+      res.status(500).json({ error: 'Failed to create room type' });
+    }
   }
 });
 
 router.put('/types/:id', (req: Request, res: Response) => {
   try {
     const { typeName, description, capacity, basePrice, maxOccupancy, bedType, sizeSqFt, isActive } = req.body;
+    
+    // Validate required fields
+    if (!typeName || !typeName.trim()) {
+      res.status(400).json({ error: 'Room type name is required' });
+      return;
+    }
+
+    // Check for duplicate name (excluding current room type)
+    const existing = db.prepare('SELECT RoomTypeID FROM RoomTypes WHERE TypeName = ? AND RoomTypeID != ?').get(typeName, req.params.id) as { RoomTypeID: number } | undefined;
+    if (existing) {
+      res.status(400).json({ error: 'A room type with this name already exists' });
+      return;
+    }
+
     db.prepare(`
       UPDATE RoomTypes SET TypeName = ?, Description = ?, Capacity = ?, BasePrice = ?, MaxOccupancy = ?, BedType = ?, SizeSqFt = ?, IsActive = ?, UpdatedDate = CURRENT_TIMESTAMP
       WHERE RoomTypeID = ?
     `).run(typeName, description, capacity, basePrice, maxOccupancy, bedType, sizeSqFt, isActive, req.params.id);
     
     res.json({ message: 'Room type updated successfully' });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to update room type' });
+  } catch (error: any) {
+    console.error('Error updating room type:', error);
+    if (error.message?.includes('UNIQUE constraint failed')) {
+      res.status(400).json({ error: 'A room type with this name already exists' });
+    } else {
+      res.status(500).json({ error: 'Failed to update room type' });
+    }
   }
 });
 

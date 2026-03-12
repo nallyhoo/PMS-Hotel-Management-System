@@ -7,7 +7,9 @@ import {
   ArrowRight,
   Search,
   CreditCard,
-  Receipt
+  Receipt,
+  Users,
+  Zap
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -73,6 +75,7 @@ export default function CheckoutDashboardPage() {
             <div className="p-6 border-b border-[#1a1a1a]/5 flex items-center justify-between">
               <h3 className="text-lg font-serif">Today's Departures</h3>
               <button 
+                onClick={() => navigate('/checkout/departures')}
                 className="text-xs font-medium text-[#1a1a1a]/60 hover:text-[#1a1a1a] flex items-center gap-1"
               >
                 View All Departures <ArrowRight size={14} />
@@ -117,13 +120,28 @@ export default function CheckoutDashboardPage() {
           <div className="bg-[#1a1a1a] text-white p-8 rounded-2xl shadow-xl space-y-6">
             <h3 className="text-lg font-serif">Quick Actions</h3>
             <div className="grid grid-cols-1 gap-3">
-              <button className="w-full py-3 px-4 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-medium uppercase tracking-widest transition-colors text-left flex items-center justify-between">
-                Express Check-out <LogOut size={14} />
+              <button 
+                onClick={() => navigate('/checkout/express')}
+                className="w-full py-3 px-4 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-medium uppercase tracking-widest transition-colors text-left flex items-center justify-between"
+              >
+                Express Check-out <Zap size={14} />
               </button>
-              <button className="w-full py-3 px-4 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-medium uppercase tracking-widest transition-colors text-left flex items-center justify-between">
+              <button 
+                onClick={() => navigate('/checkout/group')}
+                className="w-full py-3 px-4 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-medium uppercase tracking-widest transition-colors text-left flex items-center justify-between"
+              >
+                Group Check-out <Users size={14} />
+              </button>
+              <button 
+                onClick={() => navigate('/checkout/print-invoices')}
+                className="w-full py-3 px-4 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-medium uppercase tracking-widest transition-colors text-left flex items-center justify-between"
+              >
                 Print All Invoices <Receipt size={14} />
               </button>
-              <button className="w-full py-3 px-4 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-medium uppercase tracking-widest transition-colors text-left flex items-center justify-between">
+              <button 
+                onClick={() => navigate('/checkout/late-checkout')}
+                className="w-full py-3 px-4 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-medium uppercase tracking-widest transition-colors text-left flex items-center justify-between"
+              >
                 Late Checkout Requests <Clock size={14} />
               </button>
             </div>

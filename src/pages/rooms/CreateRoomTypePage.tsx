@@ -11,8 +11,9 @@ import {
   X
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import roomService from '../../api/rooms';
+import { useToastMutation } from '../../lib/useToastMutation';
 
 export default function CreateRoomTypePage() {
   const navigate = useNavigate();
@@ -54,7 +55,7 @@ export default function CreateRoomTypePage() {
     }
   }, [existingRoomType]);
 
-  const createMutation = useMutation({
+  const createMutation = useToastMutation({
     mutationFn: async (data: typeof formData) => {
       const result = await roomService.createRoomType({
         typeName: data.typeName,
@@ -79,16 +80,15 @@ export default function CreateRoomTypePage() {
       
       return result;
     },
+    successMessage: 'Room type created successfully',
+    errorMessage: 'Failed to create room type',
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['roomTypes'] });
       navigate('/rooms/types');
     },
-    onError: (err: any) => {
-      setError(err.message || 'Failed to create room type');
-    },
   });
 
-  const updateMutation = useMutation({
+  const updateMutation = useToastMutation({
     mutationFn: async (data: typeof formData) => {
       await roomService.updateRoomType(Number(id), {
         typeName: data.typeName,
@@ -111,13 +111,12 @@ export default function CreateRoomTypePage() {
         }
       }
     },
+    successMessage: 'Room type updated successfully',
+    errorMessage: 'Failed to update room type',
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['roomTypes'] });
       queryClient.invalidateQueries({ queryKey: ['roomType', id] });
       navigate('/rooms/types');
-    },
-    onError: (err: any) => {
-      setError(err.message || 'Failed to update room type');
     },
   });
 

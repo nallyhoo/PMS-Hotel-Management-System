@@ -38,14 +38,23 @@ import CreateRoomTypePage from './pages/rooms/CreateRoomTypePage';
 import CheckinDashboardPage from './pages/checkin/CheckinDashboardPage';
 import ArrivalsListPage from './pages/checkin/ArrivalsListPage';
 import CheckinProcessPage from './pages/checkin/CheckinProcessPage';
+import GroupCheckinPage from './pages/checkin/GroupCheckinPage';
+import KeyCardManagementPage from './pages/checkin/KeyCardManagementPage';
 import WalkinReservationPage from './pages/checkin/WalkinReservationPage';
 
 import CheckoutDashboardPage from './pages/checkout/CheckoutDashboardPage';
 import CheckoutProcessPage from './pages/checkout/CheckoutProcessPage';
+import DeparturesListPage from './pages/checkout/DeparturesListPage';
+import GroupCheckoutPage from './pages/checkout/GroupCheckoutPage';
+import ExpressCheckoutPage from './pages/checkout/ExpressCheckoutPage';
+import PrintAllInvoicesPage from './pages/checkout/PrintAllInvoicesPage';
+import LateCheckoutRequestsPage from './pages/checkout/LateCheckoutRequestsPage';
 
 import GuestListPage from './pages/guests/GuestListPage';
 import GuestProfilePage from './pages/guests/GuestProfilePage';
 import AddGuestPage from './pages/guests/AddGuestPage';
+import EditGuestPage from './pages/guests/EditGuestPage';
+import GuestAnalyticsPage from './pages/guests/GuestAnalyticsPage';
 
 import HousekeepingDashboard from './pages/housekeeping/HousekeepingDashboard';
 import RoomCleaningTaskList from './pages/housekeeping/RoomCleaningTaskList';
@@ -190,13 +199,22 @@ export default function App() {
         <Route path="/checkin/walkin" element={<DashboardLayout><WalkinReservationPage /></DashboardLayout>} />
         <Route path="/checkin/arrivals" element={<DashboardLayout><ArrivalsListPage /></DashboardLayout>} />
         <Route path="/checkin/process/:id" element={<DashboardLayout><CheckinProcessPage /></DashboardLayout>} />
+        <Route path="/checkin/group" element={<DashboardLayout><GroupCheckinPage /></DashboardLayout>} />
+        <Route path="/checkin/keycards" element={<DashboardLayout><KeyCardManagementPage /></DashboardLayout>} />
 
         <Route path="/checkout" element={<DashboardLayout><CheckoutDashboardPage /></DashboardLayout>} />
+        <Route path="/checkout/departures" element={<DashboardLayout><DeparturesListPage /></DashboardLayout>} />
         <Route path="/checkout/process/:id" element={<DashboardLayout><CheckoutProcessPage /></DashboardLayout>} />
+        <Route path="/checkout/group" element={<DashboardLayout><GroupCheckoutPage /></DashboardLayout>} />
+        <Route path="/checkout/express" element={<DashboardLayout><ExpressCheckoutPage /></DashboardLayout>} />
+        <Route path="/checkout/print-invoices" element={<DashboardLayout><PrintAllInvoicesPage /></DashboardLayout>} />
+        <Route path="/checkout/late-checkout" element={<DashboardLayout><LateCheckoutRequestsPage /></DashboardLayout>} />
 
         <Route path="/guests" element={<DashboardLayout><GuestListPage /></DashboardLayout>} />
+        <Route path="/guests/analytics" element={<DashboardLayout><GuestAnalyticsPage /></DashboardLayout>} />
         <Route path="/guests/profile/:id" element={<DashboardLayout><GuestProfilePage /></DashboardLayout>} />
         <Route path="/guests/add" element={<DashboardLayout><AddGuestPage /></DashboardLayout>} />
+        <Route path="/guests/edit/:id" element={<DashboardLayout><EditGuestPage /></DashboardLayout>} />
 
         <Route path="/housekeeping" element={<DashboardLayout><HousekeepingDashboard /></DashboardLayout>} />
         <Route path="/housekeeping/tasks" element={<DashboardLayout><RoomCleaningTaskList /></DashboardLayout>} />
