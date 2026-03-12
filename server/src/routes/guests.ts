@@ -70,7 +70,30 @@ router.get('/:id', (req: Request, res: Response) => {
     if (!guest) {
       return res.status(404).json({ error: 'Guest not found' });
     }
-    res.json(guest);
+    const transformedGuest = {
+      guestId: guest.GuestID,
+      firstName: guest.FirstName,
+      lastName: guest.LastName,
+      email: guest.Email,
+      phone: guest.Phone,
+      alternatePhone: guest.AlternatePhone,
+      nationality: guest.Nationality,
+      dateOfBirth: guest.DateOfBirth,
+      gender: guest.Gender,
+      address: guest.Address,
+      city: guest.City,
+      country: guest.Country,
+      postalCode: guest.PostalCode,
+      vipStatus: guest.VIPStatus,
+      blacklistReason: guest.BlacklistReason,
+      marketingConsent: guest.MarketingConsent === 1,
+      notes: guest.Notes,
+      imageUrl: guest.ImageUrl || '',
+      isActive: guest.VIPStatus !== 'Blacklist',
+      createdDate: guest.CreatedDate,
+      updatedDate: guest.UpdatedDate
+    };
+    res.json(transformedGuest);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch guest' });
   }
@@ -79,11 +102,11 @@ router.get('/:id', (req: Request, res: Response) => {
 // Create guest
 router.post('/', (req: Request, res: Response) => {
   try {
-    const { firstName, lastName, email, phone, nationality, dateOfBirth, gender, address, city, country, postalCode, vipStatus, notes } = req.body;
+    const { firstName, lastName, email, phone, nationality, dateOfBirth, gender, address, city, country, postalCode, vipStatus, notes, imageUrl } = req.body;
     const result = db.prepare(`
-      INSERT INTO Guests (FirstName, LastName, Email, Phone, Nationality, DateOfBirth, Gender, Address, City, Country, PostalCode, VIPStatus, Notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(firstName, lastName, email, phone, nationality, dateOfBirth, gender, address, city, country, postalCode, vipStatus || 'Regular', notes);
+      INSERT INTO Guests (FirstName, LastName, Email, Phone, Nationality, DateOfBirth, Gender, Address, City, Country, PostalCode, VIPStatus, Notes, ImageUrl)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(firstName, lastName, email, phone, nationality, dateOfBirth, gender, address, city, country, postalCode, vipStatus || 'Regular', notes, imageUrl || null);
     
     res.status(201).json({ guestId: result.lastInsertRowid });
   } catch (error) {
@@ -94,15 +117,27 @@ router.post('/', (req: Request, res: Response) => {
 // Update guest
 router.put('/:id', (req: Request, res: Response) => {
   try {
-    const { firstName, lastName, email, phone, nationality, dateOfBirth, gender, address, city, country, postalCode, vipStatus, notes } = req.body;
+    const { firstName, lastName, email, phone, nationality, dateOfBirth, gender, address, city, country, postalCode, vipStatus, notes, imageUrl } = req.body;
     db.prepare(`
-      UPDATE Guests SET FirstName = ?, LastName = ?, Email = ?, Phone = ?, Nationality = ?, DateOfBirth = ?, Gender = ?, Address = ?, City = ?, Country = ?, PostalCode = ?, VIPStatus = ?, Notes = ?, UpdatedDate = CURRENT_TIMESTAMP
+      UPDATE Guests SET FirstName = ?, LastName = ?, Email = ?, Phone = ?, Nationality = ?, DateOfBirth = ?, Gender = ?, Address = ?, City = ?, Country = ?, PostalCode = ?, VIPStatus = ?, Notes = ?, ImageUrl = ?, UpdatedDate = CURRENT_TIMESTAMP
       WHERE GuestID = ?
-    `).run(firstName, lastName, email, phone, nationality, dateOfBirth, gender, address, city, country, postalCode, vipStatus, notes, req.params.id);
+    `).run(firstName, lastName, email, phone, nationality, dateOfBirth, gender, address, city, country, postalCode, vipStatus, notes, imageUrl || null, req.params.id);
     
     res.json({ message: 'Guest updated successfully' });
   } catch (error) {
     res.status(500).json({ error: 'Failed to update guest' });
+  }
+});
+
+// Update guest image
+router.put('/:id/image', (req: Request, res: Response) => {
+  try {
+    const { imageUrl } = req.body;
+    db.prepare('UPDATE Guests SET ImageUrl = ?, UpdatedDate = CURRENT_TIMESTAMP WHERE GuestID = ?')
+      .run(imageUrl || null, req.params.id);
+    res.json({ message: 'Image updated successfully' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update image' });
   }
 });
 
@@ -120,7 +155,17 @@ router.delete('/:id', (req: Request, res: Response) => {
 router.get('/:id/documents', (req: Request, res: Response) => {
   try {
     const documents = db.prepare('SELECT * FROM GuestDocuments WHERE GuestID = ?').all(req.params.id);
-    res.json(documents);
+    const transformedDocuments = documents.map((d: any) => ({
+      documentId: d.DocumentID,
+      guestId: d.GuestID,
+      documentType: d.DocumentType,
+      documentNumber: d.DocumentNumber,
+      issueDate: d.IssueDate,
+      expiryDate: d.ExpiryDate,
+      imageUrl: d.ImageURL,
+      createdDate: d.CreatedDate
+    }));
+    res.json(transformedDocuments);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch documents' });
   }
@@ -144,7 +189,14 @@ router.post('/:id/documents', (req: Request, res: Response) => {
 router.get('/:id/preferences', (req: Request, res: Response) => {
   try {
     const preferences = db.prepare('SELECT * FROM GuestPreferences WHERE GuestID = ?').all(req.params.id);
-    res.json(preferences);
+    const transformedPreferences = preferences.map((p: any) => ({
+      preferenceId: p.PreferenceID,
+      guestId: p.GuestID,
+      preferenceType: p.PreferenceType,
+      preferenceValue: p.PreferenceValue,
+      notes: p.Notes
+    }));
+    res.json(transformedPreferences);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch preferences' });
   }
@@ -171,10 +223,21 @@ router.get('/:id/loyalty', (req: Request, res: Response) => {
     
     if (!loyalty) {
       const result = db.prepare('INSERT INTO GuestLoyalty (GuestID) VALUES (?)').run(req.params.id);
-      loyalty = { loyaltyId: result.lastInsertRowid, guestId: req.params.id, points: 0, tierLevel: 'Bronze' };
+      loyalty = { LoyaltyID: result.lastInsertRowid, GuestID: req.params.id, Points: 0, TierLevel: 'Bronze', TotalPointsEarned: 0, TotalPointsRedeemed: 0, MembershipStartDate: new Date().toISOString().split('T')[0] };
     }
     
-    res.json(loyalty);
+    const transformedLoyalty = {
+      loyaltyId: loyalty.LoyaltyID,
+      guestId: loyalty.GuestID,
+      points: loyalty.Points,
+      tierLevel: loyalty.TierLevel,
+      totalPointsEarned: loyalty.TotalPointsEarned,
+      totalPointsRedeemed: loyalty.TotalPointsRedeemed,
+      membershipStartDate: loyalty.MembershipStartDate,
+      createdDate: loyalty.CreatedDate,
+      updatedDate: loyalty.UpdatedDate
+    };
+    res.json(transformedLoyalty);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch loyalty' });
   }
@@ -210,7 +273,29 @@ router.get('/:id/reservations', (req: Request, res: Response) => {
       WHERE r.GuestID = ?
       ORDER BY r.CheckInDate DESC
     `).all(req.params.id);
-    res.json(reservations);
+    
+    const transformedReservations = reservations.map((r: any) => ({
+      reservationId: r.ReservationID,
+      guestId: r.GuestID,
+      branchId: r.BranchID,
+      reservationCode: r.ReservationCode,
+      checkInDate: r.CheckInDate,
+      checkOutDate: r.CheckOutDate,
+      status: r.Status,
+      bookingSource: r.BookingSource,
+      adults: r.Adults,
+      children: r.Children,
+      specialRequests: r.SpecialRequests,
+      totalAmount: r.TotalAmount,
+      depositAmount: r.DepositAmount,
+      depositPaid: r.DepositPaid === 1,
+      assignedRoomId: r.AssignedRoomID,
+      confirmationDate: r.ConfirmationDate,
+      roomTypeName: r.RoomTypeName,
+      createdDate: r.CreatedDate,
+      updatedDate: r.UpdatedDate
+    }));
+    res.json(transformedReservations);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch reservations' });
   }

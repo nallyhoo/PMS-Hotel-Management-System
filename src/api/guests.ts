@@ -74,6 +74,10 @@ class GuestService {
     return api.put<void>(`/guests/${id}`, data);
   }
 
+  async updateGuestImage(id: number, imageUrl: string): Promise<void> {
+    return api.put<void>(`/guests/${id}/image`, { imageUrl });
+  }
+
   async deleteGuest(id: number): Promise<void> {
     return api.delete<void>(`/guests/${id}`);
   }
@@ -94,16 +98,43 @@ class GuestService {
     return api.post<{ preferenceId: number }>(`/guests/${guestId}/preferences`, data);
   }
 
-  async getGuestLoyalty(guestId: number): Promise<GuestLoyalty> {
-    return api.get<GuestLoyalty>(`/guests/${guestId}/loyalty`);
+  async getGuestReservations(guestId: number): Promise<Guest[]> {
+    return api.get<Guest[]>(`/guests/${guestId}/reservations`);
   }
 
-  async updateGuestLoyalty(guestId: number, data: UpdateLoyaltyRequest): Promise<void> {
+  // Guest Notes
+  async getGuestNotes(guestId: number): Promise<any[]> {
+    return api.get<any[]>(`/guests/${guestId}/notes`);
+  }
+
+  async addGuestNote(guestId: number, data: { noteType?: string; noteContent: string }): Promise<{ noteId: number }> {
+    return api.post<{ noteId: number }>(`/guests/${guestId}/notes`, data);
+  }
+
+  async deleteGuestNote(noteId: number): Promise<void> {
+    return api.delete<void>(`/guests/notes/${noteId}`);
+  }
+
+  // Guest Preferences (additional methods)
+  async deleteGuestPreference(preferenceId: number): Promise<void> {
+    return api.delete<void>(`/guests/preferences/${preferenceId}`);
+  }
+
+  // Guest Loyalty
+  async getGuestLoyalty(guestId: number): Promise<any> {
+    return api.get<any>(`/guests/${guestId}/loyalty`);
+  }
+
+  async updateGuestLoyalty(guestId: number, data: { pointsBalance?: number; lifetimePoints?: number; tierLevel?: string; pointsExpiring?: number }): Promise<void> {
     return api.put<void>(`/guests/${guestId}/loyalty`, data);
   }
 
-  async getGuestReservations(guestId: number): Promise<Guest[]> {
-    return api.get<Guest[]>(`/guests/${guestId}/reservations`);
+  async addLoyaltyPoints(guestId: number, points: number, reason?: string): Promise<void> {
+    return api.post<void>(`/guests/${guestId}/loyalty/add-points`, { points, reason });
+  }
+
+  async redeemLoyaltyPoints(guestId: number, points: number): Promise<void> {
+    return api.post<void>(`/guests/${guestId}/loyalty/redeem-points`, { points });
   }
 }
 

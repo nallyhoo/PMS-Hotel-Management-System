@@ -7,11 +7,11 @@
     "strict": true,
     "skipLibCheck": true,
     "outDir": "./dist/server",
-    "rootDir": "./server/src",
+    "rootDir": "./src",
     "declaration": true,
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true
   },
-  "include": ["server/src/**/*"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules"]
 }

@@ -145,6 +145,8 @@ export interface Guest {
   blacklistReason: string;
   marketingConsent: boolean;
   notes: string;
+  imageUrl: string;
+  isActive: boolean;
   createdDate: string;
   updatedDate: string;
 }
