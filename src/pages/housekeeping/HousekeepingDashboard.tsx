@@ -4,8 +4,6 @@ import {
   CheckCircle2, 
   Clock, 
   AlertTriangle,
-  Users,
-  Calendar,
   ArrowRight,
   Sparkles,
   UserPlus,
@@ -13,23 +11,68 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useQuery } from '@tanstack/react-query';
+import housekeepingService, { HousekeepingStaff } from '../../api/housekeeping';
+import type { HousekeepingTask } from '../../types/database';
 
-const stats = [
-  { label: 'Total Rooms', value: '120', icon: ClipboardList, color: 'text-blue-600', bg: 'bg-blue-50' },
-  { label: 'Dirty Rooms', value: '42', icon: AlertTriangle, color: 'text-amber-600', bg: 'bg-amber-50' },
-  { label: 'In Progress', value: '12', icon: Clock, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-  { label: 'Clean & Ready', value: '66', icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-];
+interface TaskWithDetails extends HousekeepingTask {
+  roomNumber?: string;
+  typeName?: string;
+  firstName?: string;
+  lastName?: string;
+}
 
-const recentTasks = [
-  { id: 'TSK-101', room: '402', type: 'Full Clean', status: 'In Progress', staff: 'Maria G.', priority: 'High' },
-  { id: 'TSK-102', room: '105', type: 'Stay-over', status: 'Pending', staff: 'John D.', priority: 'Medium' },
-  { id: 'TSK-103', room: 'Suite 2', type: 'Deep Clean', status: 'Completed', staff: 'Elena R.', priority: 'High' },
-  { id: 'TSK-104', room: '308', type: 'Full Clean', status: 'In Progress', staff: 'Marcus C.', priority: 'Low' },
-];
+interface StaffWithTasks extends HousekeepingStaff {
+  status: 'Active' | 'Busy' | 'Break';
+}
 
 export default function HousekeepingDashboard() {
   const navigate = useNavigate();
+
+  const { data: dashboardData, isLoading, error } = useQuery({
+    queryKey: ['housekeeping', 'dashboard'],
+    queryFn: () => housekeepingService.getDashboard(),
+  });
+
+  if (error) {
+    return (
+      <div className="p-8 text-center">
+        <p className="text-red-600">Something went wrong: {(error as Error).message}</p>
+        <button 
+          onClick={() => window.location.reload()}
+          className="mt-4 px-4 py-2 bg-[#1a1a1a] text-white rounded-lg"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="p-8 text-center">
+        <p className="text-[#1a1a1a]/40">Loading dashboard...</p>
+      </div>
+    );
+  }
+
+  const stats = [
+    { label: 'Total Rooms', value: dashboardData?.stats?.totalRooms || 0, icon: ClipboardList, color: 'text-blue-600', bg: 'bg-blue-50' },
+    { label: 'Dirty Rooms', value: dashboardData?.stats?.dirtyRooms || 0, icon: AlertTriangle, color: 'text-amber-600', bg: 'bg-amber-50' },
+    { label: 'In Progress', value: dashboardData?.stats?.inProgress || 0, icon: Clock, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+    { label: 'Clean & Ready', value: dashboardData?.stats?.cleanAndReady || 0, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+  ];
+
+  const recentTasks: TaskWithDetails[] = dashboardData?.activeTasks || [];
+  const staffOnDuty: StaffWithTasks[] = (dashboardData?.staffOnDuty || []).map((s: any, idx: number) => ({
+    ...s,
+    employeeId: s.employeeId || s.EmployeeID,
+    firstName: s.firstName || s.FirstName,
+    lastName: s.lastName || s.LastName,
+    position: s.position || s.Position,
+    activeTasks: s.activeTasks ?? s.ActiveTasks ?? 0,
+    status: idx === 2 ? 'Break' : ((s.activeTasks ?? s.ActiveTasks ?? 0) > 2) ? 'Busy' : 'Active',
+  }));
 
   return (
     <div className="space-y-8">
@@ -98,40 +141,49 @@ export default function HousekeepingDashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#1a1a1a]/5">
-                {recentTasks.map((task) => (
+                {recentTasks.map((task) => {
+                  const taskAny = task as any;
+                  const roomNum = taskAny.roomNumber || taskAny.RoomNumber || `ID: ${taskAny.roomId || taskAny.RoomID}`;
+                  const firstName = taskAny.firstName || taskAny.FirstName;
+                  const lastName = taskAny.lastName || taskAny.LastName;
+                  const taskType = taskAny.taskType || taskAny.TaskType;
+                  const taskIdValue = taskAny.TaskID || taskAny.taskId || taskAny.TaskID;
+                  const priority = taskAny.priority || taskAny.Priority || 'Normal';
+                  const status = taskAny.status || taskAny.Status || 'Pending';
+                  return (
                   <tr 
-                    key={task.id} 
+                    key={taskIdValue} 
                     className="hover:bg-[#f8f9fa] transition-colors cursor-pointer group"
-                    onClick={() => navigate(`/housekeeping/tasks/${task.id}`)}
+                    onClick={() => navigate(`/housekeeping/tasks/${taskIdValue}`)}
                   >
                     <td className="px-6 py-4">
-                      <p className="text-sm font-medium">Room {task.room}</p>
+                      <p className="text-sm font-medium">Room {roomNum}</p>
                     </td>
                     <td className="px-6 py-4">
-                      <p className="text-xs text-[#1a1a1a]/60">{task.type}</p>
+                      <p className="text-xs text-[#1a1a1a]/60">{taskType}</p>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <div className="w-6 h-6 rounded-full bg-[#1a1a1a]/5 flex items-center justify-center text-[10px] font-bold">
-                          {task.staff.split(' ').map(n => n[0]).join('')}
+                          {firstName && lastName ? `${firstName[0]}${lastName[0]}` : '-'}
                         </div>
-                        <p className="text-xs font-medium">{task.staff}</p>
+                        <p className="text-xs font-medium">{firstName && lastName ? `${firstName} ${lastName}` : 'Unassigned'}</p>
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest ${
-                        task.priority === 'High' ? 'bg-red-50 text-red-600' : 
-                        task.priority === 'Medium' ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600'
+                        priority === 'Urgent' || priority === 'High' ? 'bg-red-50 text-red-600' : 
+                        priority === 'Normal' ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600'
                       }`}>
-                        {task.priority}
+                        {priority}
                       </span>
                     </td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest ${
-                        task.status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : 
-                        task.status === 'In Progress' ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-50 text-slate-600'
+                        status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : 
+                        status === 'In Progress' ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-50 text-slate-600'
                       }`}>
-                        {task.status}
+                        {status}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
@@ -140,7 +192,8 @@ export default function HousekeepingDashboard() {
                       </button>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -157,35 +210,67 @@ export default function HousekeepingDashboard() {
               Schedule
             </button>
           </div>
-          <div className="bg-white p-6 rounded-2xl border border-[#1a1a1a]/5 shadow-sm space-y-6">
-            {[
-              { name: 'Maria Garcia', role: 'Supervisor', status: 'Active', tasks: 4 },
-              { name: 'John Doe', role: 'Housekeeper', status: 'Busy', tasks: 2 },
-              { name: 'Elena Rodriguez', role: 'Housekeeper', status: 'Break', tasks: 0 },
-              { name: 'Marcus Chen', role: 'Housekeeper', status: 'Active', tasks: 3 },
-            ].map((staff, idx) => (
-              <div key={idx} className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-[#f8f9fa] flex items-center justify-center text-[#1a1a1a]/40 font-serif">
-                    {staff.name.split(' ').map(n => n[0]).join('')}
+          <div className="bg-white p-6 rounded-2xl border border-[#1a1a1a]/5 shadow-sm space-y-4">
+            {staffOnDuty.length > 0 ? (
+              <>
+                {staffOnDuty.slice(0, 4).map((staff) => {
+                  const staffAny = staff as any;
+                  const firstName = staffAny.firstName || staffAny.FirstName || '';
+                  const lastName = staffAny.lastName || staffAny.LastName || '';
+                  const position = staffAny.position || staffAny.Position || 'Housekeeper';
+                  const activeTasks = staffAny.activeTasks ?? 0;
+                  const empId = staffAny.employeeId || staffAny.EmployeeID;
+                  
+                  return (
+                  <div key={empId} className="flex items-center justify-between p-3 -mx-3 rounded-xl hover:bg-[#f8f9fa] transition-colors cursor-pointer" onClick={() => navigate(`/housekeeping/schedule`)}>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-[#1a1a1a] text-white flex items-center justify-center text-xs font-bold">
+                        {firstName && lastName ? `${firstName[0]}${lastName[0]}` : 'HK'}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">{firstName} {lastName}</p>
+                        <p className="text-[10px] text-[#1a1a1a]/40 uppercase tracking-widest font-bold">{position}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-full ${
+                        staff.status === 'Active' ? 'bg-emerald-50 text-emerald-600' : 
+                        staff.status === 'Busy' ? 'bg-amber-50 text-amber-600' : 'bg-slate-50 text-slate-400'
+                      }`}>
+                        {staff.status}
+                      </span>
+                      <p className="text-[10px] text-[#1a1a1a]/40 mt-1">{activeTasks} tasks</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-medium">{staff.name}</p>
-                    <p className="text-[10px] text-[#1a1a1a]/40 uppercase tracking-widest font-bold">{staff.role}</p>
-                  </div>
+                );
+                })}
+              </>
+            ) : (
+              <div className="text-center py-8">
+                <div className="w-12 h-12 rounded-full bg-[#f8f9fa] flex items-center justify-center mx-auto mb-3">
+                  <UserPlus size={20} className="text-[#1a1a1a]/30" />
                 </div>
-                <div className="text-right">
-                  <span className={`text-[10px] font-bold uppercase tracking-widest ${
-                    staff.status === 'Active' ? 'text-emerald-500' : 
-                    staff.status === 'Busy' ? 'text-amber-500' : 'text-slate-400'
-                  }`}>
-                    {staff.status}
-                  </span>
-                  <p className="text-[10px] text-[#1a1a1a]/40">{staff.tasks} tasks assigned</p>
-                </div>
+                <p className="text-sm text-[#1a1a1a]/40">No staff on duty</p>
+                <button 
+                  onClick={() => navigate('/housekeeping/schedule')}
+                  className="mt-2 text-xs text-indigo-600 hover:underline"
+                >
+                  Assign shifts
+                </button>
               </div>
-            ))}
-            <button className="w-full py-3 border border-dashed border-[#1a1a1a]/10 rounded-xl text-xs font-medium text-[#1a1a1a]/40 hover:border-[#1a1a1a]/40 hover:text-[#1a1a1a] transition-all">
+            )}
+            {staffOnDuty.length > 4 && (
+              <button 
+                onClick={() => navigate('/housekeeping/schedule')}
+                className="w-full py-2 text-xs text-[#1a1a1a]/60 hover:text-[#1a1a1a] text-center border-t border-[#1a1a1a]/5 pt-4 mt-2"
+              >
+                View all {staffOnDuty.length} staff →
+              </button>
+            )}
+            <button 
+              onClick={() => navigate('/housekeeping/schedule')}
+              className="w-full py-3 border border-dashed border-[#1a1a1a]/10 rounded-xl text-xs font-medium text-[#1a1a1a]/40 hover:border-[#1a1a1a]/40 hover:text-[#1a1a1a] transition-all"
+            >
               Manage Staff
             </button>
           </div>

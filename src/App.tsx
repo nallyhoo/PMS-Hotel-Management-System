@@ -63,6 +63,8 @@ import HousekeepingStaffSchedule from './pages/housekeeping/HousekeepingStaffSch
 import CleaningStatusBoard from './pages/housekeeping/CleaningStatusBoard';
 import CleaningTaskDetailsPage from './pages/housekeeping/CleaningTaskDetailsPage';
 import HousekeepingReportsPage from './pages/housekeeping/HousekeepingReportsPage';
+import HousekeepingMobileView from './pages/housekeeping/HousekeepingMobileView';
+import CreateTaskPage from './pages/housekeeping/CreateTaskPage';
 
 import MaintenanceDashboard from './pages/maintenance/MaintenanceDashboard';
 import MaintenanceRequestPage from './pages/maintenance/MaintenanceRequestPage';
@@ -221,8 +223,10 @@ export default function App() {
         <Route path="/housekeeping/assign" element={<DashboardLayout><AssignCleaningTaskPage /></DashboardLayout>} />
         <Route path="/housekeeping/schedule" element={<DashboardLayout><HousekeepingStaffSchedule /></DashboardLayout>} />
         <Route path="/housekeeping/status" element={<DashboardLayout><CleaningStatusBoard /></DashboardLayout>} />
+        <Route path="/housekeeping/tasks/new" element={<DashboardLayout><CreateTaskPage /></DashboardLayout>} />
         <Route path="/housekeeping/tasks/:id" element={<DashboardLayout><CleaningTaskDetailsPage /></DashboardLayout>} />
         <Route path="/housekeeping/reports" element={<DashboardLayout><HousekeepingReportsPage /></DashboardLayout>} />
+        <Route path="/housekeeping/mobile" element={<HousekeepingMobileView />} />
 
         <Route path="/maintenance" element={<DashboardLayout><MaintenanceDashboard /></DashboardLayout>} />
         <Route path="/maintenance/request" element={<DashboardLayout><MaintenanceRequestPage /></DashboardLayout>} />

@@ -288,6 +288,28 @@ router.post('/:id/checkin', (req: Request, res: Response) => {
   try {
     const { roomId, keyCardNumber, notes } = req.body;
 
+    const room = db.prepare('SELECT Status, CleaningStatus FROM Rooms WHERE RoomID = ?').get(roomId) as any;
+    if (!room) {
+      return res.status(404).json({ error: 'Room not found' });
+    }
+
+    if (room.CleaningStatus !== 'Clean' && room.CleaningStatus !== 'Inspected') {
+      return res.status(400).json({ 
+        error: 'Room not ready for check-in',
+        roomStatus: room.Status,
+        cleaningStatus: room.CleaningStatus,
+        message: `Room is currently ${room.CleaningStatus || 'dirty'}. Please complete cleaning before check-in.`
+      });
+    }
+
+    if (room.Status === 'Maintenance' || room.Status === 'Blocked') {
+      return res.status(400).json({ 
+        error: 'Room is not available',
+        roomStatus: room.Status,
+        message: `Room is currently under maintenance or blocked.`
+      });
+    }
+
     db.prepare(`
       INSERT INTO CheckIns (ReservationID, RoomID, CheckInDate, KeyCardNumber, AssignedRoom, Notes)
       VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?, ?)
@@ -310,7 +332,7 @@ router.post('/:id/checkin', (req: Request, res: Response) => {
 // Check-out guest
 router.post('/:id/checkout', (req: Request, res: Response) => {
   try {
-    const { totalBill, paymentStatus, roomInspected, inspectionNotes, notes } = req.body;
+    const { totalBill, paymentStatus, roomInspected, inspectionNotes, notes, skipAutoClean } = req.body;
     const reservationId = req.params.id;
 
     const reservation = db.prepare('SELECT AssignedRoomID, Status FROM Reservations WHERE ReservationID = ?').get(reservationId) as any;
@@ -319,6 +341,8 @@ router.post('/:id/checkout', (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Reservation not found' });
     }
 
+    let autoCleanCreated = false;
+
     if (reservation.AssignedRoomID) {
       db.prepare(`
         INSERT INTO CheckOuts (ReservationID, RoomID, CheckOutDate, TotalBill, PaymentStatus, RoomInspected, InspectionNotes, Notes)
@@ -326,6 +350,37 @@ router.post('/:id/checkout', (req: Request, res: Response) => {
       `).run(reservationId, reservation.AssignedRoomID, totalBill, paymentStatus, roomInspected ? 1 : 0, inspectionNotes, notes);
 
       db.prepare(`UPDATE Rooms SET Status = 'Dirty', CleaningStatus = 'Dirty' WHERE RoomID = ?`).run(reservation.AssignedRoomID);
+      
+      db.prepare(`
+        INSERT OR REPLACE INTO HousekeepingStatus (RoomID, CleaningStatus, LastCleaned, UpdatedTime, Notes)
+        VALUES (?, 'Dirty', NULL, CURRENT_TIMESTAMP, ?)
+      `).run(reservation.AssignedRoomID, `Guest checkout - room marked dirty`);
+
+      const enabledConfig = db.prepare('SELECT Value FROM Settings WHERE Key = ?').get('auto_cleanup_enabled') as any;
+      const autoCleanupEnabled = enabledConfig ? enabledConfig.Value === 'true' : true;
+
+      if (!skipAutoClean && autoCleanupEnabled) {
+        const delayConfig = db.prepare('SELECT Value FROM Settings WHERE Key = ?').get('auto_cleanup_delay') as any;
+        const delayMinutes = delayConfig ? parseInt(delayConfig.Value) || 30 : 30;
+
+        const priorityConfig = db.prepare('SELECT Value FROM Settings WHERE Key = ?').get('auto_cleanup_priority') as any;
+        const priority = priorityConfig ? priorityConfig.Value : 'High';
+
+        const taskTypeConfig = db.prepare('SELECT Value FROM Settings WHERE Key = ?').get('auto_cleanup_task_type') as any;
+        const taskType = taskTypeConfig ? taskTypeConfig.Value : 'Turnover';
+        
+        const scheduledDate = new Date();
+        scheduledDate.setMinutes(scheduledDate.getMinutes() + delayMinutes);
+        const scheduledDateStr = scheduledDate.toISOString().split('T')[0];
+        const scheduledTime = scheduledDate.toTimeString().slice(0, 5);
+
+        db.prepare(`
+          INSERT INTO HousekeepingTasks (RoomID, TaskType, Priority, ScheduledDate, ScheduledTime, Notes)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `).run(reservation.AssignedRoomID, taskType, priority, scheduledDateStr, scheduledTime, `Auto-created after guest checkout (Reservation #${reservationId})`);
+
+        autoCleanCreated = true;
+      }
     }
 
     db.prepare(`UPDATE Reservations SET Status = 'Checked Out' WHERE ReservationID = ?`).run(reservationId);
@@ -335,7 +390,7 @@ router.post('/:id/checkout', (req: Request, res: Response) => {
       VALUES (?, 'Checked Out', 'Checked Out', 'Guest checked out')
     `).run(reservationId);
 
-    res.json({ message: 'Check-out successful' });
+    res.json({ message: 'Check-out successful', autoCleanCreated });
   } catch (error) {
     console.error('Checkout error:', error);
     res.status(500).json({ error: 'Failed to check out' });

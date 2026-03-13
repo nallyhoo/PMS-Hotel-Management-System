@@ -1,5 +1,7 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
+export { API_BASE_URL };
+
 interface ApiClient {
   get<T>(url: string, options?: RequestInit): Promise<T>;
   post<T>(url: string, data?: unknown, options?: RequestInit): Promise<T>;
@@ -32,11 +34,26 @@ class FetchClient implements ApiClient {
       localStorage.removeItem('user');
       window.location.href = '/auth/login';
     }
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Request failed' }));
-      throw new Error(error.error || 'Request failed');
+    const text = await response.text();
+    if (!text) {
+      if (response.ok || response.status === 204) {
+        return {} as T;
+      }
+      const errorData = { error: `Request failed with status ${response.status}` };
+      throw new Error(errorData.error);
     }
-    return response.json();
+    try {
+      const data = JSON.parse(text);
+      if (!response.ok && response.status !== 204) {
+        throw new Error(data.error || `Request failed with status ${response.status}`);
+      }
+      return data;
+    } catch (err) {
+      if (response.ok || response.status === 204) {
+        return {} as T;
+      }
+      throw new Error(`Request failed with status ${response.status}`);
+    }
   }
 
   async get<T>(url: string, options?: RequestInit): Promise<T> {
