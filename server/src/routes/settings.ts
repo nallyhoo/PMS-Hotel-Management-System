@@ -107,4 +107,62 @@ router.put('/hotel', (req: Request, res: Response) => {
   }
 });
 
+router.get('/housekeeping/config', (req: Request, res: Response) => {
+  try {
+    const settings = db.prepare(`
+      SELECT Key, Value, Description FROM Settings 
+      WHERE Category = 'housekeeping' OR Key LIKE 'auto_cleanup%'
+    `).all();
+    res.json(settings);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch housekeeping config' });
+  }
+});
+
+router.put('/housekeeping/config', (req: Request, res: Response) => {
+  try {
+    const { auto_cleanup_enabled, auto_cleanup_delay, auto_cleanup_priority, auto_cleanup_task_type } = req.body;
+    
+    if (auto_cleanup_enabled !== undefined) {
+      const existing = db.prepare('SELECT * FROM Settings WHERE Key = ?').get('auto_cleanup_enabled');
+      if (existing) {
+        db.prepare('UPDATE Settings SET Value = ?, UpdatedDate = CURRENT_TIMESTAMP WHERE Key = ?').run(String(auto_cleanup_enabled), 'auto_cleanup_enabled');
+      } else {
+        db.prepare('INSERT INTO Settings (Key, Value, Description, Category) VALUES (?, ?, ?, ?)').run('auto_cleanup_enabled', String(auto_cleanup_enabled), 'Enable auto cleanup after checkout', 'housekeeping');
+      }
+    }
+
+    if (auto_cleanup_delay !== undefined) {
+      const existing = db.prepare('SELECT * FROM Settings WHERE Key = ?').get('auto_cleanup_delay');
+      if (existing) {
+        db.prepare('UPDATE Settings SET Value = ?, UpdatedDate = CURRENT_TIMESTAMP WHERE Key = ?').run(String(auto_cleanup_delay), 'auto_cleanup_delay');
+      } else {
+        db.prepare('INSERT INTO Settings (Key, Value, Description, Category) VALUES (?, ?, ?, ?)').run('auto_cleanup_delay', String(auto_cleanup_delay), 'Delay in minutes before cleanup', 'housekeeping');
+      }
+    }
+
+    if (auto_cleanup_priority !== undefined) {
+      const existing = db.prepare('SELECT * FROM Settings WHERE Key = ?').get('auto_cleanup_priority');
+      if (existing) {
+        db.prepare('UPDATE Settings SET Value = ?, UpdatedDate = CURRENT_TIMESTAMP WHERE Key = ?').run(auto_cleanup_priority, 'auto_cleanup_priority');
+      } else {
+        db.prepare('INSERT INTO Settings (Key, Value, Description, Category) VALUES (?, ?, ?, ?)').run('auto_cleanup_priority', auto_cleanup_priority, 'Priority for auto cleanup tasks', 'housekeeping');
+      }
+    }
+
+    if (auto_cleanup_task_type !== undefined) {
+      const existing = db.prepare('SELECT * FROM Settings WHERE Key = ?').get('auto_cleanup_task_type');
+      if (existing) {
+        db.prepare('UPDATE Settings SET Value = ?, UpdatedDate = CURRENT_TIMESTAMP WHERE Key = ?').run(auto_cleanup_task_type, 'auto_cleanup_task_type');
+      } else {
+        db.prepare('INSERT INTO Settings (Key, Value, Description, Category) VALUES (?, ?, ?, ?)').run('auto_cleanup_task_type', auto_cleanup_task_type, 'Task type for auto cleanup', 'housekeeping');
+      }
+    }
+
+    res.json({ message: 'Housekeeping config updated' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update housekeeping config' });
+  }
+});
+
 export default router;

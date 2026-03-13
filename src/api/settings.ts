@@ -45,6 +45,19 @@ export interface UpdateHotelRequest {
   timezone?: string;
 }
 
+export interface HousekeepingConfig {
+  Key: string;
+  Value: string;
+  Description: string;
+}
+
+export interface UpdateHousekeepingConfigRequest {
+  auto_cleanup_enabled?: boolean;
+  auto_cleanup_delay?: number;
+  auto_cleanup_priority?: string;
+  auto_cleanup_task_type?: string;
+}
+
 class SettingsService {
   async getTaxRates(): Promise<TaxRate[]> {
     return api.get<TaxRate[]>('/settings/tax-rates');
@@ -84,6 +97,14 @@ class SettingsService {
 
   async updateHotelInfo(data: UpdateHotelRequest): Promise<void> {
     return api.put<void>('/settings/hotel', data);
+  }
+
+  async getHousekeepingConfig(): Promise<HousekeepingConfig[]> {
+    return api.get<HousekeepingConfig[]>('/settings/housekeeping/config');
+  }
+
+  async updateHousekeepingConfig(data: UpdateHousekeepingConfigRequest): Promise<void> {
+    return api.put<void>('/settings/housekeeping/config', data);
   }
 }
 
