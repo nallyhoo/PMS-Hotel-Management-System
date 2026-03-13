@@ -8,26 +8,144 @@ import {
   User, 
   Calendar, 
   CheckCircle2, 
-  MessageSquare, 
-  Camera, 
-  Download,
-  MoreVertical,
+  Play,
+  DollarSign,
   History,
-  Info
+  Save
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { motion, AnimatePresence } from 'motion/react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import maintenanceService from '../../api/maintenance';
+import { toastSuccess, toastError } from '../../lib/toast';
 
 export default function MaintenanceTaskDetailsPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [status, setStatus] = useState('In Progress');
+  const queryClient = useQueryClient();
+  const requestId = id ? parseInt(id, 10) : null;
 
-  const timeline = [
-    { time: '09:30 AM', event: 'Task assigned to David K.', user: 'Alexander Wright', icon: User },
-    { time: '10:15 AM', event: 'Work started on site', user: 'David K.', icon: Wrench },
-    { time: '10:45 AM', event: 'Parts ordered: AC Filter (Model X-200)', user: 'David K.', icon: Clock },
-  ];
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [selectedStaffId, setSelectedStaffId] = useState<number | ''>('');
+  const [notes, setNotes] = useState('');
+  const [actualCost, setActualCost] = useState('');
+
+  const { data: requestData, isLoading, refetch } = useQuery({
+    queryKey: ['maintenance', 'request', requestId],
+    queryFn: () => maintenanceService.getRequest(requestId!),
+    enabled: !!requestId,
+  });
+
+  const { data: staffData } = useQuery({
+    queryKey: ['maintenance', 'staff'],
+    queryFn: () => maintenanceService.getStaff(),
+  });
+
+  const updateRequestMutation = useMutation({
+    mutationFn: (data: { status?: string; notes?: string; actualCost?: number }) => 
+      maintenanceService.updateRequest(requestId!, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['maintenance'] });
+      toastSuccess('Request updated successfully');
+      refetch();
+    },
+    onError: (error: any) => {
+      toastError(error.message || 'Failed to update request');
+    },
+  });
+
+  const createTaskMutation = useMutation({
+    mutationFn: (data: { requestId: number; assignedStaffId: number }) => 
+      maintenanceService.createTask(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['maintenance'] });
+      toastSuccess('Task assigned successfully');
+      setShowAssignModal(false);
+      setSelectedStaffId('');
+      refetch();
+    },
+    onError: (error: any) => {
+      toastError(error.message || 'Failed to assign task');
+    },
+  });
+
+  const request = requestData;
+  const tasks = requestData?.tasks || [];
+  const history = requestData?.history || [];
+  const currentTask = tasks.find((t: any) => t.Status === 'In Progress' || t.Status === 'in progress');
+
+  const formatStatus = (status: string) => status || 'Pending';
+  const formatPriority = (priority: string) => priority || 'Normal';
+
+  const isPending = formatStatus(request?.Status).toLowerCase() === 'pending';
+  const isInProgress = formatStatus(request?.Status).toLowerCase() === 'in progress';
+  const isCompleted = formatStatus(request?.Status).toLowerCase() === 'completed';
+
+  const handleStartWork = () => {
+    if (!selectedStaffId) {
+      setShowAssignModal(true);
+      return;
+    }
+    createTaskMutation.mutate({
+      requestId: requestId!,
+      assignedStaffId: selectedStaffId as number,
+    });
+  };
+
+  const handleComplete = () => {
+    updateRequestMutation.mutate({
+      status: 'Completed',
+      notes: notes || undefined,
+      actualCost: actualCost ? parseFloat(actualCost) : undefined,
+    });
+  };
+
+  const handleAssign = () => {
+    if (!selectedStaffId) {
+      toastError('Please select a staff member');
+      return;
+    }
+    createTaskMutation.mutate({
+      requestId: requestId!,
+      assignedStaffId: selectedStaffId as number,
+    });
+  };
+
+  const getPriorityColor = (priority: string) => {
+    const p = formatPriority(priority).toLowerCase();
+    if (p === 'urgent' || p === 'high') return 'bg-red-50 text-red-600 border-red-100';
+    if (p === 'medium') return 'bg-amber-50 text-amber-600 border-amber-100';
+    return 'bg-blue-50 text-blue-600 border-blue-100';
+  };
+
+  const getStatusColor = (status: string) => {
+    const s = formatStatus(status).toLowerCase();
+    if (s === 'completed') return 'bg-emerald-50 text-emerald-600 border-emerald-100';
+    if (s === 'in progress') return 'bg-indigo-50 text-indigo-600 border-indigo-100';
+    return 'bg-slate-50 text-slate-600 border-slate-100';
+  };
+
+  if (isLoading) {
+    return (
+      <div className="p-8 text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1a1a1a] mx-auto"></div>
+        <p className="mt-4 text-[#1a1a1a]/40">Loading...</p>
+      </div>
+    );
+  }
+
+  if (!request) {
+    return (
+      <div className="p-8 text-center">
+        <p className="text-[#1a1a1a]/40">Request not found</p>
+        <button 
+          onClick={() => navigate('/maintenance/tasks')}
+          className="mt-4 text-indigo-600 hover:underline"
+        >
+          Back to Tasks
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 pb-20">
@@ -42,167 +160,246 @@ export default function MaintenanceTaskDetailsPage() {
           </button>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-serif font-medium text-[#1a1a1a]">Task {id || 'MNT-2041'}</h1>
-              <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${
-                status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'
-              }`}>
-                {status}
+              <h1 className="text-2xl font-serif font-medium text-[#1a1a1a]">MNT-{requestId}</h1>
+              <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border ${getStatusColor(request?.Status)}`}>
+                {formatStatus(request?.Status)}
+              </span>
+              <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border ${getPriorityColor(request?.Priority)}`}>
+                {formatPriority(request?.Priority)}
               </span>
             </div>
-            <p className="text-[#1a1a1a]/40 text-sm mt-1">Reported on March 9, 2024 at 09:30 AM</p>
+            <p className="text-sm text-[#1a1a1a]/60 mt-1">
+              Room {request?.RoomNumber} • {request?.RequestType}
+            </p>
           </div>
         </div>
+
+        {/* Action Buttons */}
         <div className="flex items-center gap-3">
-          <button className="p-2 hover:bg-[#1a1a1a]/5 rounded-lg transition-colors border border-[#1a1a1a]/10">
-            <Download size={18} className="text-[#1a1a1a]/60" />
-          </button>
-          <button className="p-2 hover:bg-[#1a1a1a]/5 rounded-lg transition-colors border border-[#1a1a1a]/10">
-            <MoreVertical size={18} className="text-[#1a1a1a]/60" />
-          </button>
-          <button 
-            onClick={() => setStatus('Completed')}
-            className="flex items-center gap-2 px-6 py-2 bg-[#1a1a1a] text-white rounded-xl text-sm font-medium hover:bg-[#1a1a1a]/90 transition-all shadow-sm"
-          >
-            <CheckCircle2 size={16} />
-            Mark as Completed
-          </button>
+          {isPending && (
+            <button 
+              onClick={handleStartWork}
+              disabled={createTaskMutation.isPending}
+              className="flex items-center gap-2 px-6 py-2.5 bg-[#1a1a1a] text-white rounded-xl text-xs font-medium uppercase tracking-widest hover:bg-[#333] transition-colors disabled:opacity-50"
+            >
+              <Play size={16} /> {createTaskMutation.isPending ? 'Processing...' : 'Start Work'}
+            </button>
+          )}
+          {isInProgress && (
+            <button 
+              onClick={handleComplete}
+              disabled={updateRequestMutation.isPending}
+              className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-medium uppercase tracking-widest hover:bg-emerald-700 transition-colors disabled:opacity-50"
+            >
+              <CheckCircle2 size={16} /> {updateRequestMutation.isPending ? 'Processing...' : 'Mark Complete'}
+            </button>
+          )}
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Column: Details */}
-        <div className="lg:col-span-2 space-y-8">
-          {/* Main Info Card */}
-          <div className="bg-white rounded-2xl border border-[#1a1a1a]/5 shadow-sm overflow-hidden">
-            <div className="p-8 space-y-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3 text-[#1a1a1a]/40">
-                    <MapPin size={18} />
-                    <span className="text-xs font-semibold uppercase tracking-widest">Location</span>
-                  </div>
-                  <p className="text-lg font-medium">Room 402 (Standard King)</p>
-                </div>
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3 text-[#1a1a1a]/40">
-                    <AlertCircle size={18} />
-                    <span className="text-xs font-semibold uppercase tracking-widest">Priority</span>
-                  </div>
-                  <span className="px-3 py-1 bg-red-50 text-red-600 rounded-full text-xs font-bold uppercase tracking-widest">High Priority</span>
-                </div>
-              </div>
-
-              <div className="space-y-4 pt-8 border-t border-[#1a1a1a]/5">
-                <div className="flex items-center gap-3 text-[#1a1a1a]/40">
-                  <MessageSquare size={18} />
-                  <span className="text-xs font-semibold uppercase tracking-widest">Issue Description</span>
-                </div>
-                <p className="text-sm leading-relaxed text-[#1a1a1a]/80">
-                  Guest reported that the air conditioning unit is leaking water onto the carpet. The unit is making a loud rattling noise when running. Water damage to the carpet is minimal but needs immediate attention to prevent mold.
-                </p>
-              </div>
-
-              <div className="space-y-4 pt-8 border-t border-[#1a1a1a]/5">
-                <div className="flex items-center gap-3 text-[#1a1a1a]/40">
-                  <Camera size={18} />
-                  <span className="text-xs font-semibold uppercase tracking-widest">Attached Photos</span>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                  {[1, 2].map((i) => (
-                    <div key={i} className="aspect-video bg-[#f8f9fa] rounded-xl border border-[#1a1a1a]/5 overflow-hidden group cursor-pointer relative">
-                      <img 
-                        src={`https://picsum.photos/seed/maintenance-${i}/400/300`} 
-                        alt="Maintenance" 
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                      />
-                      <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <span className="text-white text-[10px] font-bold uppercase tracking-widest">View Full Size</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Activity Timeline */}
-          <div className="bg-white rounded-2xl border border-[#1a1a1a]/5 shadow-sm p-8">
-            <h3 className="font-serif text-lg font-medium mb-8 flex items-center gap-2">
-              <History size={20} className="text-[#1a1a1a]/40" />
-              Activity History
-            </h3>
-            <div className="space-y-8 relative before:absolute before:left-4 before:top-2 before:bottom-2 before:w-px before:bg-[#1a1a1a]/5">
-              {timeline.map((item, index) => (
-                <div key={index} className="relative pl-12">
-                  <div className="absolute left-0 top-1 w-8 h-8 rounded-full bg-white border border-[#1a1a1a]/5 flex items-center justify-center z-10">
-                    <item.icon size={14} className="text-[#1a1a1a]/40" />
-                  </div>
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <p className="text-sm font-medium text-[#1a1a1a]">{item.event}</p>
-                    <span className="text-[10px] font-bold text-[#1a1a1a]/30 uppercase tracking-widest">{item.time}</span>
-                  </div>
-                  <p className="text-xs text-[#1a1a1a]/40 mt-1">By {item.user}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column: Assignment & Actions */}
-        <div className="space-y-8">
-          {/* Assigned Staff */}
-          <div className="bg-white rounded-2xl border border-[#1a1a1a]/5 shadow-sm p-6">
-            <h3 className="text-[10px] font-bold text-[#1a1a1a]/40 uppercase tracking-widest mb-6">Assigned Staff</h3>
-            <div className="flex items-center gap-4 p-4 bg-[#f8f9fa] rounded-2xl border border-[#1a1a1a]/5">
-              <div className="w-12 h-12 rounded-full bg-[#1a1a1a] flex items-center justify-center text-lg font-serif italic border-2 border-white shadow-sm text-white">
-                DK
-              </div>
-              <div>
-                <p className="text-sm font-medium">David K.</p>
-                <p className="text-xs text-[#1a1a1a]/40">Senior Technician</p>
-              </div>
-            </div>
-            <button className="w-full mt-4 text-xs font-semibold text-[#1a1a1a]/40 hover:text-[#1a1a1a] transition-colors py-2">Reassign Task</button>
-          </div>
-
-          {/* Task Info */}
-          <div className="bg-white rounded-2xl border border-[#1a1a1a]/5 shadow-sm p-6 space-y-6">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-[#1a1a1a]/40 font-medium">Category</span>
-              <span className="text-sm font-medium">HVAC</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-[#1a1a1a]/40 font-medium">Estimated Time</span>
-              <span className="text-sm font-medium">2.5 Hours</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-[#1a1a1a]/40 font-medium">Parts Required</span>
-              <span className="text-sm font-medium">Yes</span>
-            </div>
-          </div>
-
-          {/* Quick Actions */}
-          <div className="bg-[#1a1a1a] rounded-2xl p-6 text-white space-y-4">
-            <h3 className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Quick Actions</h3>
-            <button className="w-full flex items-center gap-3 px-4 py-3 bg-white/10 hover:bg-white/20 rounded-xl transition-all text-sm font-medium">
-              <MessageSquare size={18} className="text-white/60" />
-              Message Technician
-            </button>
-            <button className="w-full flex items-center gap-3 px-4 py-3 bg-white/10 hover:bg-white/20 rounded-xl transition-all text-sm font-medium">
-              <Calendar size={18} className="text-white/60" />
-              Reschedule Work
-            </button>
-          </div>
-
-          {/* Info Box */}
-          <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl flex gap-3 text-amber-800">
-            <Info size={18} className="shrink-0 mt-0.5" />
-            <p className="text-xs leading-relaxed opacity-80">
-              This task is currently blocking Room 402 from being sold. Priority is set to High to ensure room availability for tonight's arrivals.
+        {/* Main Content */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Description */}
+          <div className="bg-white p-6 rounded-2xl border border-[#1a1a1a]/5 shadow-sm">
+            <h3 className="text-lg font-serif mb-4">Description</h3>
+            <p className="text-sm text-[#1a1a1a]/60">
+              {request?.Description || 'No description provided'}
             </p>
           </div>
+
+          {/* Cost Details */}
+          <div className="bg-white p-6 rounded-2xl border border-[#1a1a1a]/5 shadow-sm">
+            <h3 className="text-lg font-serif mb-4">Cost Details</h3>
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <p className="text-[10px] uppercase tracking-widest font-bold text-[#1a1a1a]/40 mb-1">Estimated Cost</p>
+                <p className="text-xl font-serif">
+                  ${request?.EstimatedCost || request?.estimatedCost || '0.00'}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-widest font-bold text-[#1a1a1a]/40 mb-1">Actual Cost</p>
+                <p className="text-xl font-serif text-emerald-600">
+                  ${request?.ActualCost || request?.actualCost || '0.00'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Timeline / History */}
+          <div className="bg-white p-6 rounded-2xl border border-[#1a1a1a]/5 shadow-sm">
+            <h3 className="text-lg font-serif mb-4">Activity History</h3>
+            {history.length > 0 ? (
+              <div className="space-y-4">
+                {history.map((item: any, idx: number) => (
+                  <div key={idx} className="flex items-start gap-4">
+                    <div className="w-8 h-8 rounded-full bg-[#f8f9fa] flex items-center justify-center">
+                      <History size={14} className="text-[#1a1a1a]/40" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm">{item.Notes}</p>
+                      <p className="text-[10px] text-[#1a1a1a]/40 mt-1">
+                        {item.UpdateDate ? new Date(item.UpdateDate).toLocaleString() : ''}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-[#1a1a1a]/40">No activity yet</p>
+            )}
+          </div>
+        </div>
+
+        {/* Sidebar */}
+        <div className="space-y-6">
+          {/* Details Card */}
+          <div className="bg-white p-6 rounded-2xl border border-[#1a1a1a]/5 shadow-sm space-y-4">
+            <h3 className="text-lg font-serif">Details</h3>
+            
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-[#1a1a1a]/40 uppercase tracking-widest">Location</span>
+                <span className="text-sm font-medium">Room {request?.RoomNumber}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-[#1a1a1a]/40 uppercase tracking-widest">Type</span>
+                <span className="text-sm">{request?.RequestType}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-[#1a1a1a]/40 uppercase tracking-widest">Priority</span>
+                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${getPriorityColor(request?.Priority)}`}>
+                  {formatPriority(request?.Priority)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-[#1a1a1a]/40 uppercase tracking-widest">Reported</span>
+                <span className="text-sm">
+                  {request?.ReportedDate ? new Date(request.ReportedDate).toLocaleDateString() : '-'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-[#1a1a1a]/40 uppercase tracking-widest">Scheduled</span>
+                <span className="text-sm">
+                  {request?.ScheduledDate ? new Date(request.ScheduledDate).toLocaleDateString() : '-'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Assigned Staff */}
+          <div className="bg-white p-6 rounded-2xl border border-[#1a1a1a]/5 shadow-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-serif">Assigned To</h3>
+              {isPending && (
+                <button 
+                  onClick={() => setShowAssignModal(true)}
+                  className="text-xs text-indigo-600 hover:underline"
+                >
+                  Assign
+                </button>
+              )}
+            </div>
+            {currentTask?.AssignedStaffID ? (
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-[#1a1a1a] text-white flex items-center justify-center text-sm font-bold">
+                  {(currentTask as any).FirstName?.[0]}{(currentTask as any).LastName?.[0]}
+                </div>
+                <div>
+                  <p className="text-sm font-medium">
+                    {(currentTask as any).FirstName} {(currentTask as any).LastName}
+                  </p>
+                  <p className="text-[10px] text-[#1a1a1a]/40">Staff Member</p>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-[#1a1a1a]/40">Not assigned</p>
+            )}
+          </div>
+
+          {/* Complete Form */}
+          {isInProgress && (
+            <div className="bg-white p-6 rounded-2xl border border-[#1a1a1a]/5 shadow-sm space-y-4">
+              <h3 className="text-lg font-serif">Complete Task</h3>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest font-bold text-[#1a1a1a]/40">Actual Cost</label>
+                  <input 
+                    type="number"
+                    value={actualCost}
+                    onChange={(e) => setActualCost(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full px-4 py-2 bg-[#f8f9fa] border-none rounded-xl text-sm outline-none focus:ring-1 focus:ring-[#1a1a1a]/10"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest font-bold text-[#1a1a1a]/40">Notes</label>
+                  <textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Completion notes..."
+                    rows={3}
+                    className="w-full px-4 py-2 bg-[#f8f9fa] border-none rounded-xl text-sm outline-none focus:ring-1 focus:ring-[#1a1a1a]/10 resize-none"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Assign Modal */}
+      {showAssignModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md space-y-4">
+            <h3 className="text-lg font-serif">Assign Staff</h3>
+            <p className="text-sm text-[#1a1a1a]/60">Select a staff member to assign this task.</p>
+            
+            <div className="space-y-2">
+              {(staffData || []).map((staff: any) => (
+                <button
+                  key={staff.EmployeeID || staff.employeeId}
+                  onClick={() => setSelectedStaffId(staff.EmployeeID || staff.employeeId)}
+                  className={`w-full p-4 rounded-xl border text-left transition-all ${
+                    selectedStaffId === (staff.EmployeeID || staff.employeeId)
+                      ? 'border-[#1a1a1a] bg-[#f8f9fa]'
+                      : 'border-[#1a1a1a]/10 hover:border-[#1a1a1a]/30'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-[#1a1a1a] text-white flex items-center justify-center text-sm font-bold">
+                      {(staff.FirstName || staff.firstName)?.[0]}{(staff.LastName || staff.lastName)?.[0]}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">{staff.FirstName || staff.firstName} {staff.LastName || staff.lastName}</p>
+                      <p className="text-[10px] text-[#1a1a1a]/40">
+                        {staff.activeTasks || 0} active tasks
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4">
+              <button 
+                onClick={() => setShowAssignModal(false)}
+                className="px-4 py-2 border border-[#1a1a1a]/10 rounded-xl text-sm"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={isInProgress ? handleAssign : handleStartWork}
+                disabled={!selectedStaffId || createTaskMutation.isPending}
+                className="px-6 py-2 bg-[#1a1a1a] text-white rounded-xl text-sm font-medium disabled:opacity-50"
+              >
+                {createTaskMutation.isPending ? 'Processing...' : 'Assign'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

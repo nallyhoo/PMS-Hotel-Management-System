@@ -44,6 +44,10 @@ export interface GetMaintenanceHistoryParams {
 }
 
 class MaintenanceService {
+  async getDashboard(): Promise<any> {
+    return api.get<any>('/maintenance/dashboard');
+  }
+
   async getRequests(params?: GetMaintenanceRequestsParams): Promise<any[]> {
     const queryParams = new URLSearchParams();
     if (params?.status) queryParams.append('status', params.status);
@@ -82,6 +86,10 @@ class MaintenanceService {
     
     const query = queryParams.toString();
     return api.get<any[]>(`/maintenance/history${query ? `?${query}` : ''}`);
+  }
+
+  async getStaff(): Promise<any[]> {
+    return api.get<any[]>('/maintenance/staff');
   }
 }
 

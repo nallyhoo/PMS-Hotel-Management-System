@@ -10,23 +10,68 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
-  Plus
+  Plus,
+  ArrowRight
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-
-const tasks = [
-  { id: 'MNT-2041', location: 'Room 402', issue: 'AC Leaking', category: 'HVAC', priority: 'High', status: 'In Progress', assignedTo: 'David K.', reportedAt: '2024-03-09 09:30 AM' },
-  { id: 'MNT-2042', location: 'Lobby', issue: 'Light Bulb Out', category: 'General', priority: 'Low', status: 'Pending', assignedTo: 'Unassigned', reportedAt: '2024-03-09 10:30 AM' },
-  { id: 'MNT-2043', location: 'Pool Area', issue: 'Filter Cleaning', category: 'General', priority: 'Medium', status: 'Completed', assignedTo: 'Sarah M.', reportedAt: '2024-03-08 02:00 PM' },
-  { id: 'MNT-2044', location: 'Room 105', issue: 'Door Lock Jammed', category: 'General', priority: 'High', status: 'In Progress', assignedTo: 'David K.', reportedAt: '2024-03-09 11:00 AM' },
-  { id: 'MNT-2045', location: 'Room 305', issue: 'Shower Drain Clogged', category: 'Plumbing', priority: 'High', status: 'Pending', assignedTo: 'Unassigned', reportedAt: '2024-03-09 11:15 AM' },
-  { id: 'MNT-2046', location: 'Kitchen', issue: 'Oven Not Heating', category: 'Electrical', priority: 'High', status: 'Pending', assignedTo: 'Unassigned', reportedAt: '2024-03-09 11:45 AM' },
-  { id: 'MNT-2047', location: 'Gym', issue: 'Treadmill Squeaking', category: 'General', priority: 'Medium', status: 'Pending', assignedTo: 'Unassigned', reportedAt: '2024-03-09 12:00 PM' },
-];
+import { useQuery } from '@tanstack/react-query';
+import maintenanceService from '../../api/maintenance';
 
 export default function MaintenanceTaskListPage() {
-  const [searchTerm, setSearchTerm] = useState('');
   const navigate = useNavigate();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [priorityFilter, setPriorityFilter] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+
+  const { data: requestsData, isLoading } = useQuery({
+    queryKey: ['maintenance', 'requests', statusFilter, priorityFilter, categoryFilter],
+    queryFn: () => maintenanceService.getRequests({
+      status: statusFilter || undefined,
+      priority: priorityFilter || undefined,
+    }),
+  });
+
+  const requests = requestsData || [];
+
+  const filteredRequests = requests.filter((r: any) => {
+    const searchLower = searchTerm.toLowerCase();
+    const requestId = String(r.RequestID || r.requestId || '');
+    const roomNum = String(r.RoomNumber || r.roomNumber || '');
+    const issue = String(r.RequestType || r.requestType || '');
+    
+    return !searchTerm || 
+      requestId.toLowerCase().includes(searchLower) ||
+      roomNum.toLowerCase().includes(searchLower) ||
+      issue.toLowerCase().includes(searchLower);
+  });
+
+  const formatStatus = (status: string) => status || 'Pending';
+  const formatPriority = (priority: string) => priority || 'Normal';
+
+  const getPriorityColor = (priority: string) => {
+    const p = formatPriority(priority).toLowerCase();
+    if (p === 'urgent' || p === 'high') return 'bg-red-50 text-red-600';
+    if (p === 'medium') return 'bg-amber-50 text-amber-600';
+    return 'bg-blue-50 text-blue-600';
+  };
+
+  const getStatusColor = (status: string) => {
+    const s = formatStatus(status).toLowerCase();
+    if (s === 'completed') return 'bg-emerald-50 text-emerald-600';
+    if (s === 'in progress') return 'bg-indigo-50 text-indigo-600';
+    if (s === 'pending') return 'bg-slate-50 text-slate-600';
+    return 'bg-slate-50 text-slate-600';
+  };
+
+  if (isLoading) {
+    return (
+      <div className="p-8 text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1a1a1a] mx-auto"></div>
+        <p className="mt-4 text-[#1a1a1a]/40">Loading tasks...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -63,118 +108,126 @@ export default function MaintenanceTaskListPage() {
           />
         </div>
         <div className="flex items-center gap-3">
-          <select className="bg-[#f8f9fa] border border-[#1a1a1a]/5 rounded-xl px-4 py-2 text-sm font-medium focus:ring-0">
-            <option>All Categories</option>
-            <option>HVAC</option>
-            <option>Plumbing</option>
-            <option>Electrical</option>
-            <option>General</option>
+          <select 
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="bg-[#f8f9fa] border border-[#1a1a1a]/5 rounded-xl px-4 py-2 text-sm font-medium focus:ring-0"
+          >
+            <option value="">All Types</option>
+            <option value="Plumbing">Plumbing</option>
+            <option value="Electrical">Electrical</option>
+            <option value="HVAC">HVAC</option>
+            <option value="General">General</option>
           </select>
-          <select className="bg-[#f8f9fa] border border-[#1a1a1a]/5 rounded-xl px-4 py-2 text-sm font-medium focus:ring-0">
-            <option>All Status</option>
-            <option>Pending</option>
-            <option>In Progress</option>
-            <option>Completed</option>
+          <select 
+            value={priorityFilter}
+            onChange={(e) => setPriorityFilter(e.target.value)}
+            className="bg-[#f8f9fa] border border-[#1a1a1a]/5 rounded-xl px-4 py-2 text-sm font-medium focus:ring-0"
+          >
+            <option value="">All Priority</option>
+            <option value="Urgent">Urgent</option>
+            <option value="High">High</option>
+            <option value="Medium">Medium</option>
+            <option value="Low">Low</option>
           </select>
-          <button className="p-2 bg-[#f8f9fa] border border-[#1a1a1a]/5 rounded-xl hover:bg-[#1a1a1a]/5 transition-colors">
-            <Filter size={18} className="text-[#1a1a1a]/60" />
-          </button>
+          <select 
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="bg-[#f8f9fa] border border-[#1a1a1a]/5 rounded-xl px-4 py-2 text-sm font-medium focus:ring-0"
+          >
+            <option value="">All Status</option>
+            <option value="Pending">Pending</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Completed">Completed</option>
+            <option value="Closed">Closed</option>
+          </select>
         </div>
       </div>
 
-      {/* Task Table */}
+      {/* Tasks Table */}
       <div className="bg-white rounded-2xl border border-[#1a1a1a]/5 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-[#f8f9fa]">
-                <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-[#1a1a1a]/40">Task ID</th>
-                <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-[#1a1a1a]/40">Issue & Location</th>
-                <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-[#1a1a1a]/40">Category</th>
-                <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-[#1a1a1a]/40">Priority</th>
-                <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-[#1a1a1a]/40">Status</th>
-                <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-[#1a1a1a]/40">Assigned To</th>
-                <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-[#1a1a1a]/40 text-right">Actions</th>
+          <table className="w-full">
+            <thead className="bg-[#f8f9fa]">
+              <tr>
+                <th className="px-6 py-4 text-left text-[10px] uppercase tracking-widest font-bold text-[#1a1a1a]/40">ID</th>
+                <th className="px-6 py-4 text-left text-[10px] uppercase tracking-widest font-bold text-[#1a1a1a]/40">Location</th>
+                <th className="px-6 py-4 text-left text-[10px] uppercase tracking-widest font-bold text-[#1a1a1a]/40">Issue</th>
+                <th className="px-6 py-4 text-left text-[10px] uppercase tracking-widest font-bold text-[#1a1a1a]/40">Category</th>
+                <th className="px-6 py-4 text-left text-[10px] uppercase tracking-widest font-bold text-[#1a1a1a]/40">Priority</th>
+                <th className="px-6 py-4 text-left text-[10px] uppercase tracking-widest font-bold text-[#1a1a1a]/40">Status</th>
+                <th className="px-6 py-4 text-left text-[10px] uppercase tracking-widest font-bold text-[#1a1a1a]/40">Assigned To</th>
+                <th className="px-6 py-4 text-left text-[10px] uppercase tracking-widest font-bold text-[#1a1a1a]/40">Reported</th>
+                <th className="px-6 py-4"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1a1a1a]/5">
-              {tasks.map((task) => (
+              {filteredRequests.length > 0 ? filteredRequests.map((request: any) => (
                 <tr 
-                  key={task.id} 
-                  className="hover:bg-[#f8f9fa] transition-colors group cursor-pointer"
-                  onClick={() => navigate(`/maintenance/tasks/${task.id}`)}
+                  key={request.RequestID || request.requestId}
+                  className="hover:bg-[#f8f9fa] transition-colors cursor-pointer"
+                  onClick={() => navigate(`/maintenance/tasks/${request.RequestID || request.requestId}`)}
                 >
                   <td className="px-6 py-4">
-                    <span className="text-sm font-medium text-[#1a1a1a]">{task.id}</span>
-                    <p className="text-[10px] text-[#1a1a1a]/40 mt-0.5">{task.reportedAt}</p>
+                    <span className="text-sm font-medium">MNT-{request.RequestID || request.requestId}</span>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium text-[#1a1a1a]">{task.issue}</span>
-                      <div className="flex items-center gap-1 text-xs text-[#1a1a1a]/40 mt-1">
-                        <MapPin size={12} />
-                        {task.location}
-                      </div>
+                    <div className="flex items-center gap-2">
+                      <MapPin size={14} className="text-[#1a1a1a]/30" />
+                      <span className="text-sm">Room {request.RoomNumber || '-'}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="flex items-center gap-2 text-sm text-[#1a1a1a]/60">
-                      <Wrench size={14} className="text-[#1a1a1a]/30" />
-                      {task.category}
-                    </div>
+                    <span className="text-sm">{request.RequestType || request.requestType || '-'}</span>
+                    {request.Description && (
+                      <p className="text-xs text-[#1a1a1a]/40 truncate max-w-[200px]">{request.Description}</p>
+                    )}
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider ${
-                      task.priority === 'High' ? 'bg-red-50 text-red-600' : 
-                      task.priority === 'Medium' ? 'bg-amber-50 text-amber-600' : 
-                      'bg-blue-50 text-blue-600'
-                    }`}>
-                      {task.priority}
+                    <span className="text-sm text-[#1a1a1a]/60">{request.RequestType || '-'}</span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-widest ${getPriorityColor(request.Priority || request.priority)}`}>
+                      {formatPriority(request.Priority || request.priority)}
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-1.5 h-1.5 rounded-full ${
-                        task.status === 'Completed' ? 'bg-emerald-500' : 
-                        task.status === 'In Progress' ? 'bg-blue-500' : 
-                        'bg-gray-400'
-                      }`}></div>
-                      <span className="text-sm font-medium text-[#1a1a1a]/80">{task.status}</span>
-                    </div>
+                    <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-widest ${getStatusColor(request.Status || request.status)}`}>
+                      {formatStatus(request.Status || request.status)}
+                    </span>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-[#f8f9fa] border border-[#1a1a1a]/5 flex items-center justify-center text-[10px] font-serif italic">
-                        {task.assignedTo === 'Unassigned' ? '?' : task.assignedTo.split(' ').map(n => n[0]).join('')}
-                      </div>
-                      <span className="text-sm text-[#1a1a1a]/60">{task.assignedTo}</span>
-                    </div>
+                    <span className="text-sm text-[#1a1a1a]/60">
+                      {request.AssignedToFirstName ? `${request.AssignedToFirstName} ${request.AssignedToLastName || ''}` : 'Unassigned'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="text-sm text-[#1a1a1a]/40">
+                      {request.ReportedDate ? new Date(request.ReportedDate).toLocaleDateString() : '-'}
+                    </span>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button className="p-2 hover:bg-[#1a1a1a]/5 rounded-lg transition-colors">
-                      <MoreHorizontal size={18} className="text-[#1a1a1a]/40" />
-                    </button>
+                    <ArrowRight size={16} className="text-[#1a1a1a]/30" />
                   </td>
                 </tr>
-              ))}
+              )) : (
+                <tr>
+                  <td colSpan={9} className="px-6 py-12 text-center">
+                    <div className="flex flex-col items-center gap-3">
+                      <Wrench size={32} className="text-[#1a1a1a]/20" />
+                      <p className="text-[#1a1a1a]/40">No maintenance tasks found</p>
+                      <button 
+                        onClick={() => navigate('/maintenance/request')}
+                        className="text-sm text-indigo-600 hover:underline"
+                      >
+                        Create new request
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
-        </div>
-
-        {/* Pagination */}
-        <div className="p-6 border-t border-[#1a1a1a]/5 flex items-center justify-between">
-          <p className="text-sm text-[#1a1a1a]/40">Showing 1 to 7 of 42 tasks</p>
-          <div className="flex items-center gap-2">
-            <button className="p-2 border border-[#1a1a1a]/10 rounded-lg hover:bg-[#f8f9fa] disabled:opacity-50" disabled>
-              <ChevronLeft size={16} />
-            </button>
-            <button className="w-8 h-8 flex items-center justify-center bg-[#1a1a1a] text-white rounded-lg text-sm font-medium">1</button>
-            <button className="w-8 h-8 flex items-center justify-center hover:bg-[#f8f9fa] rounded-lg text-sm font-medium">2</button>
-            <button className="w-8 h-8 flex items-center justify-center hover:bg-[#f8f9fa] rounded-lg text-sm font-medium">3</button>
-            <button className="p-2 border border-[#1a1a1a]/10 rounded-lg hover:bg-[#f8f9fa]">
-              <ChevronRight size={16} />
-            </button>
-          </div>
         </div>
       </div>
     </div>

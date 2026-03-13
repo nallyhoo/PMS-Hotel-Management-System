@@ -4,57 +4,75 @@ import {
   AlertTriangle, 
   CheckCircle2, 
   Clock, 
-  ArrowUpRight, 
-  ArrowDownRight,
+  ArrowRight,
   Plus,
-  Search,
   Filter
 } from 'lucide-react';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell
-} from 'recharts';
+import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell } from 'recharts';
+import maintenanceService from '../../api/maintenance';
 
-const stats = [
-  { label: 'Total Requests', value: '42', change: '+5%', trend: 'up', icon: Wrench, color: 'blue' },
-  { label: 'Urgent Tasks', value: '8', change: '-2', trend: 'down', icon: AlertTriangle, color: 'red' },
-  { label: 'In Progress', value: '15', change: '+3', trend: 'up', icon: Clock, color: 'amber' },
-  { label: 'Completed Today', value: '12', change: '+4', trend: 'up', icon: CheckCircle2, color: 'emerald' },
-];
-
-const taskDistribution = [
-  { name: 'Plumbing', value: 35, color: '#3b82f6' },
-  { name: 'Electrical', value: 25, color: '#ef4444' },
-  { name: 'HVAC', value: 20, color: '#f59e0b' },
-  { name: 'General', value: 20, color: '#10b981' },
-];
-
-const weeklyPerformance = [
-  { day: 'Mon', completed: 8, reported: 10 },
-  { day: 'Tue', completed: 12, reported: 15 },
-  { day: 'Wed', completed: 10, reported: 12 },
-  { day: 'Thu', completed: 15, reported: 14 },
-  { day: 'Fri', completed: 14, reported: 18 },
-  { day: 'Sat', completed: 9, reported: 8 },
-  { day: 'Sun', completed: 6, reported: 5 },
-];
-
-const recentTasks = [
-  { id: 'MNT-2041', location: 'Room 402', issue: 'AC Leaking', priority: 'High', status: 'In Progress', assignedTo: 'David K.' },
-  { id: 'MNT-2042', location: 'Lobby', issue: 'Light Bulb Out', priority: 'Low', status: 'Pending', assignedTo: 'Unassigned' },
-  { id: 'MNT-2043', location: 'Pool Area', issue: 'Filter Cleaning', priority: 'Medium', status: 'Completed', assignedTo: 'Sarah M.' },
-  { id: 'MNT-2044', location: 'Room 105', issue: 'Door Lock Jammed', priority: 'High', status: 'In Progress', assignedTo: 'David K.' },
-];
+const COLORS = ['#3b82f6', '#ef4444', '#f59e0b', '#10b981', '#8b5cf6'];
 
 export default function MaintenanceDashboard() {
+  const navigate = useNavigate();
+
+  const { data: dashboardData, isLoading } = useQuery({
+    queryKey: ['maintenance', 'dashboard'],
+    queryFn: () => maintenanceService.getDashboard(),
+    refetchInterval: 30000,
+  });
+
+  const stats = dashboardData?.stats || {};
+  const taskDistribution = dashboardData?.taskDistribution || [];
+  const weeklyPerformance = dashboardData?.weeklyPerformance || [];
+  const recentRequests = dashboardData?.recentRequests || [];
+
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const weeklyData = dayNames.map((day, idx) => {
+    const dayData = weeklyPerformance.find((w: any) => parseInt(w.day) === idx);
+    return {
+      day,
+      reported: dayData?.reported || 0,
+      completed: dayData?.completed || 0,
+    };
+  });
+
+  const formatStatus = (status: string) => {
+    if (!status) return 'Pending';
+    return status;
+  };
+
+  const formatPriority = (priority: string) => {
+    if (!priority) return 'Normal';
+    return priority;
+  };
+
+  const getPriorityColor = (priority: string) => {
+    const p = formatPriority(priority).toLowerCase();
+    if (p === 'urgent' || p === 'high') return 'text-red-600 bg-red-50';
+    if (p === 'medium') return 'text-amber-600 bg-amber-50';
+    return 'text-blue-600 bg-blue-50';
+  };
+
+  const getStatusColor = (status: string) => {
+    const s = formatStatus(status).toLowerCase();
+    if (s === 'completed') return 'text-emerald-600 bg-emerald-50';
+    if (s === 'in progress') return 'text-indigo-600 bg-indigo-50';
+    if (s === 'pending') return 'text-slate-600 bg-slate-50';
+    return 'text-slate-600 bg-slate-50';
+  };
+
+  if (isLoading) {
+    return (
+      <div className="p-8 text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1a1a1a] mx-auto"></div>
+        <p className="mt-4 text-[#1a1a1a]/40">Loading dashboard...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -67,7 +85,10 @@ export default function MaintenanceDashboard() {
             <Filter size={16} />
             Filters
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-[#1a1a1a] text-white rounded-lg text-sm font-medium hover:bg-[#1a1a1a]/90 transition-all shadow-sm">
+          <button 
+            onClick={() => navigate('/maintenance/request')}
+            className="flex items-center gap-2 px-4 py-2 bg-[#1a1a1a] text-white rounded-lg text-sm font-medium hover:bg-[#1a1a1a]/90 transition-all shadow-sm"
+          >
             <Plus size={16} />
             New Request
           </button>
@@ -76,81 +97,95 @@ export default function MaintenanceDashboard() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat) => (
-          <div key={stat.label} className="bg-white p-6 rounded-2xl border border-[#1a1a1a]/5 shadow-sm">
-            <div className="flex items-start justify-between mb-4">
-              <div className={`p-3 rounded-xl bg-${stat.color}-50 text-${stat.color}-600`}>
-                <stat.icon size={20} />
-              </div>
-              <div className={`flex items-center gap-1 text-xs font-medium ${stat.trend === 'up' ? 'text-emerald-600' : 'text-red-600'}`}>
-                {stat.change}
-                {stat.trend === 'up' ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
-              </div>
+        <div className="bg-white p-6 rounded-2xl border border-[#1a1a1a]/5 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-2 bg-blue-50 rounded-lg">
+              <Wrench size={18} className="text-blue-600" />
             </div>
-            <p className="text-2xl font-semibold text-[#1a1a1a]">{stat.value}</p>
-            <p className="text-sm text-[#1a1a1a]/40 font-medium uppercase tracking-wider mt-1">{stat.label}</p>
           </div>
-        ))}
+          <p className="text-[10px] uppercase tracking-widest font-bold text-[#1a1a1a]/40 mb-1">Total Requests</p>
+          <p className="text-2xl font-serif">{stats.totalRequests || 0}</p>
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl border border-[#1a1a1a]/5 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-2 bg-red-50 rounded-lg">
+              <AlertTriangle size={18} className="text-red-600" />
+            </div>
+          </div>
+          <p className="text-[10px] uppercase tracking-widest font-bold text-[#1a1a1a]/40 mb-1">Urgent Tasks</p>
+          <p className="text-2xl font-serif">{stats.urgentRequests || 0}</p>
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl border border-[#1a1a1a]/5 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-2 bg-indigo-50 rounded-lg">
+              <Clock size={18} className="text-indigo-600" />
+            </div>
+          </div>
+          <p className="text-[10px] uppercase tracking-widest font-bold text-[#1a1a1a]/40 mb-1">In Progress</p>
+          <p className="text-2xl font-serif">{stats.inProgressRequests || 0}</p>
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl border border-[#1a1a1a]/5 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-2 bg-emerald-50 rounded-lg">
+              <CheckCircle2 size={18} className="text-emerald-600" />
+            </div>
+          </div>
+          <p className="text-[10px] uppercase tracking-widest font-bold text-[#1a1a1a]/40 mb-1">Completed Today</p>
+          <p className="text-2xl font-serif">{stats.completedToday || 0}</p>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      {/* Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Weekly Performance */}
-        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-[#1a1a1a]/5 shadow-sm">
-          <div className="flex items-center justify-between mb-8">
-            <h3 className="font-serif text-lg font-medium">Weekly Performance</h3>
-            <select className="text-xs font-medium bg-[#f8f9fa] border-none rounded-lg px-3 py-1.5 focus:ring-0">
-              <option>Last 7 Days</option>
-              <option>Last 30 Days</option>
-            </select>
-          </div>
-          <div className="h-[300px]">
+        <div className="bg-white p-6 rounded-2xl border border-[#1a1a1a]/5 shadow-sm space-y-6">
+          <h3 className="text-lg font-serif">Weekly Performance</h3>
+          <div className="h-[250px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={weeklyPerformance}>
+              <BarChart data={weeklyData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9ca3af' }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9ca3af' }} />
-                <Tooltip 
-                  cursor={{ fill: '#f8f9fa' }}
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                />
-                <Bar dataKey="reported" fill="#e5e7eb" radius={[4, 4, 0, 0]} name="Reported" />
-                <Bar dataKey="completed" fill="#1a1a1a" radius={[4, 4, 0, 0]} name="Completed" />
+                <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#1a1a1a66' }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#1a1a1a66' }} />
+                <Tooltip />
+                <Bar dataKey="reported" fill="#1a1a1a" radius={[4, 4, 0, 0]} name="Reported" />
+                <Bar dataKey="completed" fill="#10b981" radius={[4, 4, 0, 0]} name="Completed" />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
 
         {/* Task Distribution */}
-        <div className="bg-white p-6 rounded-2xl border border-[#1a1a1a]/5 shadow-sm">
-          <h3 className="font-serif text-lg font-medium mb-8">Task Distribution</h3>
-          <div className="h-[250px]">
+        <div className="bg-white p-6 rounded-2xl border border-[#1a1a1a]/5 shadow-sm space-y-6">
+          <h3 className="text-lg font-serif">Task Distribution</h3>
+          <div className="h-[200px]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
                   data={taskDistribution}
                   cx="50%"
                   cy="50%"
-                  innerRadius={60}
+                  innerRadius={50}
                   outerRadius={80}
-                  paddingAngle={5}
+                  paddingAngle={2}
                   dataKey="value"
+                  nameKey="name"
                 >
-                  {taskDistribution.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  {taskDistribution.map((entry: any, index: number) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
                 <Tooltip />
               </PieChart>
             </ResponsiveContainer>
           </div>
-          <div className="space-y-3 mt-4">
-            {taskDistribution.map((item) => (
-              <div key={item.name} className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }}></div>
-                  <span className="text-sm text-[#1a1a1a]/60">{item.name}</span>
-                </div>
-                <span className="text-sm font-medium">{item.value}%</span>
+          <div className="flex flex-wrap justify-center gap-4">
+            {taskDistribution.map((item: any, idx: number) => (
+              <div key={idx} className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[idx % COLORS.length] }} />
+                <span className="text-xs font-medium">{item.name}: {item.value}</span>
               </div>
             ))}
           </div>
@@ -159,49 +194,72 @@ export default function MaintenanceDashboard() {
 
       {/* Recent Tasks */}
       <div className="bg-white rounded-2xl border border-[#1a1a1a]/5 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-[#1a1a1a]/5 flex items-center justify-between">
-          <h3 className="font-serif text-lg font-medium">Recent Tasks</h3>
-          <button className="text-sm font-medium text-[#1a1a1a]/60 hover:text-[#1a1a1a]">View All</button>
+        <div className="p-6 border-b border-[#1a1a1a]/5">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-serif">Recent Requests</h3>
+            <button 
+              onClick={() => navigate('/maintenance/tasks')}
+              className="text-xs font-medium text-[#1a1a1a]/60 hover:text-[#1a1a1a]"
+            >
+              View All →
+            </button>
+          </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-[#f8f9fa]">
-                <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-[#1a1a1a]/40">Task ID</th>
-                <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-[#1a1a1a]/40">Location</th>
-                <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-[#1a1a1a]/40">Issue</th>
-                <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-[#1a1a1a]/40">Priority</th>
-                <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-[#1a1a1a]/40">Status</th>
-                <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-[#1a1a1a]/40">Assigned To</th>
+          <table className="w-full">
+            <thead className="bg-[#f8f9fa]">
+              <tr>
+                <th className="px-6 py-3 text-left text-[10px] uppercase tracking-widest font-bold text-[#1a1a1a]/40">ID</th>
+                <th className="px-6 py-3 text-left text-[10px] uppercase tracking-widest font-bold text-[#1a1a1a]/40">Location</th>
+                <th className="px-6 py-3 text-left text-[10px] uppercase tracking-widest font-bold text-[#1a1a1a]/40">Issue</th>
+                <th className="px-6 py-3 text-left text-[10px] uppercase tracking-widest font-bold text-[#1a1a1a]/40">Priority</th>
+                <th className="px-6 py-3 text-left text-[10px] uppercase tracking-widest font-bold text-[#1a1a1a]/40">Status</th>
+                <th className="px-6 py-3 text-left text-[10px] uppercase tracking-widest font-bold text-[#1a1a1a]/40">Assigned To</th>
+                <th className="px-6 py-3"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1a1a1a]/5">
-              {recentTasks.map((task) => (
-                <tr key={task.id} className="hover:bg-[#f8f9fa] transition-colors group cursor-pointer">
-                  <td className="px-6 py-4 text-sm font-medium text-[#1a1a1a]">{task.id}</td>
-                  <td className="px-6 py-4 text-sm text-[#1a1a1a]/60">{task.location}</td>
-                  <td className="px-6 py-4 text-sm text-[#1a1a1a]/60">{task.issue}</td>
+              {recentRequests.length > 0 ? recentRequests.map((request: any) => (
+                <tr 
+                  key={request.RequestID || request.requestId} 
+                  className="hover:bg-[#f8f9fa] transition-colors cursor-pointer"
+                  onClick={() => navigate(`/maintenance/tasks/${request.RequestID || request.requestId}`)}
+                >
                   <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider ${
-                      task.priority === 'High' ? 'bg-red-50 text-red-600' : 
-                      task.priority === 'Medium' ? 'bg-amber-50 text-amber-600' : 
-                      'bg-blue-50 text-blue-600'
-                    }`}>
-                      {task.priority}
+                    <span className="text-sm font-medium">MNT-{request.RequestID || request.requestId}</span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="text-sm">Room {request.RoomNumber || request.roomNumber}</span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="text-sm text-[#1a1a1a]/60">{request.RequestType || request.requestType}</span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-widest ${getPriorityColor(request.Priority || request.priority)}`}>
+                      {formatPriority(request.Priority || request.priority)}
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider ${
-                      task.status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : 
-                      task.status === 'In Progress' ? 'bg-blue-50 text-blue-600' : 
-                      'bg-gray-50 text-gray-600'
-                    }`}>
-                      {task.status}
+                    <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-widest ${getStatusColor(request.Status || request.status)}`}>
+                      {formatStatus(request.Status || request.status)}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm text-[#1a1a1a]/60">{task.assignedTo}</td>
+                  <td className="px-6 py-4">
+                    <span className="text-sm text-[#1a1a1a]/60">
+                      {request.AssignedToFirstName ? `${request.AssignedToFirstName} ${request.AssignedToLastName || ''}` : 'Unassigned'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <ArrowRight size={16} className="text-[#1a1a1a]/30" />
+                  </td>
                 </tr>
-              ))}
+              )) : (
+                <tr>
+                  <td colSpan={7} className="px-6 py-8 text-center text-[#1a1a1a]/40">
+                    No maintenance requests found
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
