@@ -34,18 +34,20 @@ class FetchClient implements ApiClient {
       localStorage.removeItem('user');
       window.location.href = '/auth/login';
     }
+    
     const text = await response.text();
     if (!text) {
       if (response.ok || response.status === 204) {
         return {} as T;
       }
-      const errorData = { error: `Request failed with status ${response.status}` };
-      throw new Error(errorData.error);
+      const errorData = { error: `Request failed with status ${response.status}`, message: 'An unexpected error occurred' };
+      throw new Error(errorData.message);
     }
     try {
       const data = JSON.parse(text);
       if (!response.ok && response.status !== 204) {
-        throw new Error(data.error || `Request failed with status ${response.status}`);
+        const errorMessage = data.message || data.error || `Request failed with status ${response.status}`;
+        throw new Error(errorMessage);
       }
       return data;
     } catch (err) {

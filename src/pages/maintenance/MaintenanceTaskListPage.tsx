@@ -2,11 +2,8 @@ import React, { useState } from 'react';
 import { 
   Search, 
   Filter, 
-  MoreHorizontal, 
   Wrench, 
   MapPin, 
-  Clock, 
-  AlertCircle,
   ChevronLeft,
   ChevronRight,
   Download,
@@ -15,7 +12,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import maintenanceService from '../../api/maintenance';
+import maintenanceService, { PaginatedResponse } from '../../api/maintenance';
 
 export default function MaintenanceTaskListPage() {
   const navigate = useNavigate();
@@ -23,28 +20,22 @@ export default function MaintenanceTaskListPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit] = useState(20);
 
-  const { data: requestsData, isLoading } = useQuery({
-    queryKey: ['maintenance', 'requests', statusFilter, priorityFilter, categoryFilter],
+  const { data: responseData, isLoading } = useQuery<PaginatedResponse<any>>({
+    queryKey: ['maintenance', 'requests', page, limit, statusFilter, priorityFilter, categoryFilter, searchTerm],
     queryFn: () => maintenanceService.getRequests({
+      page,
+      limit,
       status: statusFilter || undefined,
       priority: priorityFilter || undefined,
+      search: searchTerm || undefined,
     }),
   });
 
-  const requests = requestsData || [];
-
-  const filteredRequests = requests.filter((r: any) => {
-    const searchLower = searchTerm.toLowerCase();
-    const requestId = String(r.RequestID || r.requestId || '');
-    const roomNum = String(r.RoomNumber || r.roomNumber || '');
-    const issue = String(r.RequestType || r.requestType || '');
-    
-    return !searchTerm || 
-      requestId.toLowerCase().includes(searchLower) ||
-      roomNum.toLowerCase().includes(searchLower) ||
-      issue.toLowerCase().includes(searchLower);
-  });
+  const requests = responseData?.data || [];
+  const pagination = responseData?.pagination || { page: 1, limit: 20, total: 0, totalPages: 0 };
 
   const formatStatus = (status: string) => status || 'Pending';
   const formatPriority = (priority: string) => priority || 'Normal';
@@ -63,6 +54,17 @@ export default function MaintenanceTaskListPage() {
     if (s === 'pending') return 'bg-slate-50 text-slate-600';
     return 'bg-slate-50 text-slate-600';
   };
+
+  const handleSearch = (value: string) => {
+    setSearchTerm(value);
+    setPage(1);
+  };
+
+  const handleFilterChange = (setter: React.Dispatch<React.SetStateAction<string>>) => 
+    (value: string) => {
+      setter(value);
+      setPage(1);
+    };
 
   if (isLoading) {
     return (
@@ -104,13 +106,13 @@ export default function MaintenanceTaskListPage() {
             placeholder="Search by task ID, location, or issue..." 
             className="bg-transparent border-none focus:ring-0 text-sm w-full"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => handleSearch(e.target.value)}
           />
         </div>
         <div className="flex items-center gap-3">
           <select 
             value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
+            onChange={(e) => handleFilterChange(setCategoryFilter)(e.target.value)}
             className="bg-[#f8f9fa] border border-[#1a1a1a]/5 rounded-xl px-4 py-2 text-sm font-medium focus:ring-0"
           >
             <option value="">All Types</option>
@@ -121,7 +123,7 @@ export default function MaintenanceTaskListPage() {
           </select>
           <select 
             value={priorityFilter}
-            onChange={(e) => setPriorityFilter(e.target.value)}
+            onChange={(e) => handleFilterChange(setPriorityFilter)(e.target.value)}
             className="bg-[#f8f9fa] border border-[#1a1a1a]/5 rounded-xl px-4 py-2 text-sm font-medium focus:ring-0"
           >
             <option value="">All Priority</option>
@@ -132,7 +134,7 @@ export default function MaintenanceTaskListPage() {
           </select>
           <select 
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(e) => handleFilterChange(setStatusFilter)(e.target.value)}
             className="bg-[#f8f9fa] border border-[#1a1a1a]/5 rounded-xl px-4 py-2 text-sm font-medium focus:ring-0"
           >
             <option value="">All Status</option>
@@ -162,48 +164,48 @@ export default function MaintenanceTaskListPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1a1a1a]/5">
-              {filteredRequests.length > 0 ? filteredRequests.map((request: any) => (
+              {requests.length > 0 ? requests.map((request: any) => (
                 <tr 
-                  key={request.RequestID || request.requestId}
+                  key={request.requestId}
                   className="hover:bg-[#f8f9fa] transition-colors cursor-pointer"
-                  onClick={() => navigate(`/maintenance/tasks/${request.RequestID || request.requestId}`)}
+                  onClick={() => navigate(`/maintenance/tasks/${request.requestId}`)}
                 >
                   <td className="px-6 py-4">
-                    <span className="text-sm font-medium">MNT-{request.RequestID || request.requestId}</span>
+                    <span className="text-sm font-medium">MNT-{request.requestId}</span>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
                       <MapPin size={14} className="text-[#1a1a1a]/30" />
-                      <span className="text-sm">Room {request.RoomNumber || '-'}</span>
+                      <span className="text-sm">Room {request.roomNumber || '-'}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <span className="text-sm">{request.RequestType || request.requestType || '-'}</span>
-                    {request.Description && (
-                      <p className="text-xs text-[#1a1a1a]/40 truncate max-w-[200px]">{request.Description}</p>
+                    <span className="text-sm">{request.requestType || '-'}</span>
+                    {request.description && (
+                      <p className="text-xs text-[#1a1a1a]/40 truncate max-w-[200px]">{request.description}</p>
                     )}
                   </td>
                   <td className="px-6 py-4">
-                    <span className="text-sm text-[#1a1a1a]/60">{request.RequestType || '-'}</span>
+                    <span className="text-sm text-[#1a1a1a]/60">{request.requestType || '-'}</span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-widest ${getPriorityColor(request.Priority || request.priority)}`}>
-                      {formatPriority(request.Priority || request.priority)}
+                    <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-widest ${getPriorityColor(request.priority)}`}>
+                      {formatPriority(request.priority)}
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-widest ${getStatusColor(request.Status || request.status)}`}>
-                      {formatStatus(request.Status || request.status)}
+                    <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-widest ${getStatusColor(request.status)}`}>
+                      {formatStatus(request.status)}
                     </span>
                   </td>
                   <td className="px-6 py-4">
                     <span className="text-sm text-[#1a1a1a]/60">
-                      {request.AssignedToFirstName ? `${request.AssignedToFirstName} ${request.AssignedToLastName || ''}` : 'Unassigned'}
+                      {request.assignedToFirstName ? `${request.assignedToFirstName} ${request.assignedToLastName || ''}` : 'Unassigned'}
                     </span>
                   </td>
                   <td className="px-6 py-4">
                     <span className="text-sm text-[#1a1a1a]/40">
-                      {request.ReportedDate ? new Date(request.ReportedDate).toLocaleDateString() : '-'}
+                      {request.reportedDate ? new Date(request.reportedDate).toLocaleDateString() : '-'}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
@@ -229,6 +231,60 @@ export default function MaintenanceTaskListPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination */}
+        {pagination.total > 0 && (
+          <div className="px-6 py-4 border-t border-[#1a1a1a]/5 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="text-sm text-[#1a1a1a]/60">
+              Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} results
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={pagination.page <= 1}
+                className="flex items-center gap-1 px-3 py-2 text-sm font-medium rounded-lg border border-[#1a1a1a]/10 hover:bg-[#f8f9fa] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronLeft size={16} />
+                Previous
+              </button>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                  let pageNum: number;
+                  if (pagination.totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (pagination.page <= 3) {
+                    pageNum = i + 1;
+                  } else if (pagination.page >= pagination.totalPages - 2) {
+                    pageNum = pagination.totalPages - 4 + i;
+                  } else {
+                    pageNum = pagination.page - 2 + i;
+                  }
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setPage(pageNum)}
+                      className={`w-10 h-10 text-sm font-medium rounded-lg transition-colors ${
+                        pagination.page === pageNum
+                          ? 'bg-[#1a1a1a] text-white'
+                          : 'hover:bg-[#f8f9fa] text-[#1a1a1a]/60'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))}
+                disabled={pagination.page >= pagination.totalPages}
+                className="flex items-center gap-1 px-3 py-2 text-sm font-medium rounded-lg border border-[#1a1a1a]/10 hover:bg-[#f8f9fa] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Next
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

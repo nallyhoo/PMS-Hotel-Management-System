@@ -31,7 +31,34 @@ export function initDatabase() {
       }
     }
   }
+
+  createIndexes();
   console.log('Database initialized');
+}
+
+function createIndexes() {
+  const indexes = [
+    'CREATE INDEX IF NOT EXISTS idx_maintenance_requests_status ON MaintenanceRequests(Status)',
+    'CREATE INDEX IF NOT EXISTS idx_maintenance_requests_priority ON MaintenanceRequests(Priority)',
+    'CREATE INDEX IF NOT EXISTS idx_maintenance_requests_room ON MaintenanceRequests(RoomID)',
+    'CREATE INDEX IF NOT EXISTS idx_maintenance_requests_date ON MaintenanceRequests(ReportedDate)',
+    'CREATE INDEX IF NOT EXISTS idx_maintenance_tasks_request ON MaintenanceTasks(RequestID)',
+    'CREATE INDEX IF NOT EXISTS idx_maintenance_tasks_staff ON MaintenanceTasks(AssignedStaffID)',
+    'CREATE INDEX IF NOT EXISTS idx_maintenance_tasks_status ON MaintenanceTasks(Status)',
+    'CREATE INDEX IF NOT EXISTS idx_maintenance_history_request ON MaintenanceHistory(RequestID)',
+    'CREATE INDEX IF NOT EXISTS idx_maintenance_history_date ON MaintenanceHistory(UpdateDate)',
+  ];
+
+  for (const index of indexes) {
+    try {
+      db.exec(index);
+    } catch (e: any) {
+      if (!e.message.includes('already exists')) {
+        console.error('Index error:', e.message);
+      }
+    }
+  }
+  console.log('Database indexes created');
 }
 
 export function seedDatabase() {
@@ -158,5 +185,193 @@ export function seedDatabase() {
     insertRoom.run(...room);
   }
 
-  console.log('Database seeded with sample data');
+  // Seed Housekeeping data
+  // First, ensure departments exist
+  const deptCheck = db.prepare('SELECT DepartmentID FROM Departments WHERE DepartmentName = ?').get('Housekeeping') as any;
+  let hkDeptId = deptCheck?.DepartmentID;
+  
+  if (!hkDeptId) {
+    // Check if any departments exist
+    const existingDepts = db.prepare('SELECT COUNT(*) as count FROM Departments').get() as any;
+    if (!existingDepts || existingDepts.count === 0) {
+      // Seed default departments
+      const defaultDepts = [
+        ['Front Office', 'Guest Services and Reception'],
+        ['Housekeeping', 'Housekeeping and Cleaning Department'],
+        ['Food & Beverage', 'Restaurant and Kitchen'],
+        ['Maintenance', 'Property Maintenance'],
+        ['Finance', 'Accounting and Billing'],
+      ];
+      const insertDept = db.prepare('INSERT INTO Departments (DepartmentName, Description) VALUES (?, ?)');
+      for (const d of defaultDepts) {
+        insertDept.run(d[0], d[1]);
+      }
+    }
+    hkDeptId = db.prepare('SELECT DepartmentID FROM Departments WHERE DepartmentName = ?').get('Housekeeping') as any;
+  }
+
+  // If still no Housekeeping department, create it
+  if (!hkDeptId) {
+    const insertDept = db.prepare('INSERT INTO Departments (DepartmentName, Description) VALUES (?, ?)');
+    insertDept.run('Housekeeping', 'Housekeeping and Cleaning Department');
+    hkDeptId = db.prepare('SELECT DepartmentID FROM Departments WHERE DepartmentName = ?').get('Housekeeping') as any;
+  }
+
+  // Insert housekeeping staff
+  const hkStaff = [
+    ['Maria', 'Garcia', 'Housekeeper', 'Female', '2024-01-15', 'Active', '555-0101', 'maria@hotel.com'],
+    ['John', 'Doe', 'Housekeeper', 'Male', '2024-02-01', 'Active', '555-0102', 'john@hotel.com'],
+    ['Elena', 'Rodriguez', 'Housekeeper', 'Female', '2024-01-20', 'Active', '555-0103', 'elena@hotel.com'],
+    ['Marcus', 'Chen', 'Senior Housekeeper', 'Male', '2023-11-01', 'Active', '555-0104', 'marcus@hotel.com'],
+    ['Sarah', 'Johnson', 'Supervisor', 'Female', '2023-08-15', 'Active', '555-0105', 'sarah@hotel.com'],
+  ];
+
+  const insertStaff = db.prepare(`
+    INSERT INTO Employees (BranchID, DepartmentID, FirstName, LastName, Position, Gender, HireDate, EmploymentStatus, Phone, Email)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  const staffIds: number[] = [];
+  for (const s of hkStaff) {
+    insertStaff.run(1, hkDeptId, s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7]);
+    const lastId = db.prepare('SELECT last_insert_rowid() as id').get() as any;
+    staffIds.push(lastId.id);
+  }
+
+  // Insert housekeeping tasks
+  const hkToday = new Date().toISOString().split('T')[0];
+  const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+  const hkTasks = [
+    [1, 'Turnover', 'High', yesterday, '09:00', yesterday, '11:30', staffIds[0], 'Completed'],
+    [2, 'Standard Clean', 'Normal', yesterday, '10:00', yesterday, '11:00', staffIds[1], 'Completed'],
+    [3, 'Deep Clean', 'High', yesterday, '14:00', yesterday, '16:30', staffIds[2], 'Completed'],
+    [4, 'Turnover', 'High', hkToday, '08:00', hkToday, null, staffIds[0], 'In Progress'],
+    [5, 'Standard Clean', 'Normal', hkToday, '09:00', null, null, staffIds[1], 'Pending'],
+    [6, 'Standard Clean', 'Normal', hkToday, '10:00', null, null, staffIds[2], 'Pending'],
+    [7, 'Turnover', 'Urgent', hkToday, '11:00', null, null, staffIds[3], 'Pending'],
+    [8, 'Standard Clean', 'Low', hkToday, '14:00', null, null, staffIds[0], 'Pending'],
+    [9, 'Inspection', 'Normal', hkToday, null, null, null, null, 'Pending'],
+    [10, 'Turnover', 'High', tomorrow, '08:00', null, null, staffIds[1], 'Pending'],
+    [5, 'Standard Clean', 'Normal', tomorrow, '09:00', null, null, staffIds[2], 'Pending'],
+  ];
+
+  const insertTask = db.prepare(`
+    INSERT INTO HousekeepingTasks (RoomID, TaskType, Priority, ScheduledDate, ScheduledTime, StartTime, EndTime, AssignedStaffID, Status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  for (const t of hkTasks) {
+    insertTask.run(t[0], t[1], t[2], t[3], t[4], t[5], t[6], t[7], t[8]);
+  }
+
+  // Insert housekeeping supplies
+  const supplies = [
+    ['Towels', 'SUP-001', 'Linens', 'piece', 50, 100, 2.50, 'HotelSupply Co'],
+    ['Bed Sheets', 'SUP-002', 'Linens', 'set', 30, 80, 5.00, 'HotelSupply Co'],
+    ['Pillowcases', 'SUP-003', 'Linens', 'piece', 40, 100, 1.50, 'HotelSupply Co'],
+    ['Bath Mats', 'SUP-004', 'Linens', 'piece', 25, 50, 3.00, 'HotelSupply Co'],
+    ['Shampoo', 'SUP-005', 'Amenities', 'bottle', 20, 60, 4.00, 'BeautyPro'],
+    ['Soap', 'SUP-006', 'Amenities', 'bar', 30, 80, 1.00, 'BeautyPro'],
+    ['Toilet Paper', 'SUP-007', 'Paper Products', 'roll', 50, 200, 0.50, 'PaperWorld'],
+    ['Tissue Box', 'SUP-008', 'Paper Products', 'box', 20, 50, 2.00, 'PaperWorld'],
+    ['Glass Cleaner', 'SUP-009', 'Cleaning Agents', 'bottle', 10, 30, 8.00, 'CleanMax'],
+    ['Floor Cleaner', 'SUP-010', 'Cleaning Agents', 'bottle', 15, 25, 12.00, 'CleanMax'],
+    ['Mop', 'SUP-011', 'Equipment', 'piece', 5, 15, 25.00, 'EquipPro'],
+    ['Vacuum Cleaner Bags', 'SUP-012', 'Equipment', 'bag', 10, 20, 15.00, 'EquipPro'],
+  ];
+
+  const insertSupply = db.prepare(`
+    INSERT INTO HousekeepingSupplies (ItemName, ItemCode, Category, Unit, MinStockLevel, CurrentStock, CostPerUnit, Supplier)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  for (const s of supplies) {
+    insertSupply.run(s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7]);
+  }
+
+  // Insert HousekeepingStatus for some rooms
+  const insertStatus = db.prepare(`
+    INSERT OR REPLACE INTO HousekeepingStatus (RoomID, CleaningStatus, LastCleaned, UpdatedTime, Notes)
+    VALUES (?, ?, ?, datetime('now'), ?)
+  `);
+  
+  insertStatus.run(1, 'Clean', yesterday, 'Quick touch-up done');
+  insertStatus.run(2, 'Clean', hkToday, 'Daily clean');
+  insertStatus.run(3, 'Clean', yesterday, null);
+  insertStatus.run(5, 'Dirty', yesterday, 'Guest checkout - needs full clean');
+  insertStatus.run(9, 'Dirty', yesterday, 'Guest checkout - needs full clean');
+
+  // Seed Maintenance data
+  const maintenanceDeptCheck = db.prepare('SELECT DepartmentID FROM Departments WHERE DepartmentName = ?').get('Maintenance') as any;
+  let maintenanceDeptId = maintenanceDeptCheck?.DepartmentID;
+  
+  if (!maintenanceDeptId) {
+    const insertDept = db.prepare('INSERT INTO Departments (DepartmentName, Description) VALUES (?, ?)');
+    insertDept.run('Maintenance', 'Property Maintenance');
+    maintenanceDeptId = db.prepare('SELECT DepartmentID FROM Departments WHERE DepartmentName = ?').get('Maintenance') as any;
+  }
+
+  // Insert maintenance staff
+  const mntStaff = [
+    ['Bob', 'Wilson', 'Maintenance Technician', 'Male', '2023-06-01', 'Active', '555-0201', 'bob@hotel.com'],
+    ['Carlos', 'Martinez', 'Electrician', 'Male', '2023-08-15', 'Active', '555-0202', 'carlos@hotel.com'],
+    ['Diana', 'Lee', 'Plumber', 'Female', '2023-04-20', 'Active', '555-0203', 'diana@hotel.com'],
+  ];
+
+  const mntStaffIds: number[] = [];
+  for (const s of mntStaff) {
+    insertStaff.run(1, maintenanceDeptId, s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7]);
+    const lastId = db.prepare('SELECT last_insert_rowid() as id').get() as any;
+    mntStaffIds.push(lastId.id);
+  }
+
+  // Insert maintenance requests
+  const mntRequests = [
+    [1, 'Plumbing', 'High', 'Leaking faucet in bathroom sink', 1, yesterday, 'Open', null, 50.00, null, 'Faucet needs replacement'],
+    [2, 'Electrical', 'Emergency', 'Power outlet not working', 2, yesterday, 'In Progress', today, 75.00, null, 'Checking wiring'],
+    [3, 'HVAC', 'Normal', 'AC not cooling properly', 1, yesterday, 'Open', null, 150.00, null, 'Filter might need replacement'],
+    [5, 'Furniture', 'Low', 'Broken chair leg', 3, hkToday, 'Open', null, 25.00, null, 'Chair in room 105'],
+    [3, 'Appliance', 'High', 'Microwave not heating', 1, hkToday, 'Completed', yesterday, 80.00, 80.00, 'Replaced magnetron'],
+    [1, 'Plumbing', 'Normal', 'Toilet running constantly', 2, yesterday, 'Open', null, 60.00, null, 'Flapper needs replacement'],
+    [4, 'Electrical', 'Normal', 'Light flickering in bedroom', 1, hkToday, 'In Progress', today, 45.00, null, 'Loose connection'],
+    [2, 'HVAC', 'High', 'Heater not working', 3, yesterday, 'Open', null, 200.00, null, 'Thermostat issue'],
+  ];
+
+  const insertMntRequest = db.prepare(`
+    INSERT INTO MaintenanceRequests (RoomID, RequestType, Priority, Description, ReportedBy, ReportedDate, Status, ScheduledDate, EstimatedCost, ActualCost, Notes)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  for (const r of mntRequests) {
+    insertMntRequest.run(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9], r[10]);
+  }
+
+  // Insert some maintenance tasks
+  const insertMntTask = db.prepare(`
+    INSERT INTO MaintenanceTasks (RequestID, AssignedStaffID, Status, StartDate, CompletionDate, Notes)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `);
+
+  // Task for request 2 (In Progress)
+  insertMntTask.run(2, mntStaffIds[1], 'In Progress', today, null, 'Checking electrical wiring');
+  
+  // Task for request 5 (Completed)
+  insertMntTask.run(5, mntStaffIds[2], 'Completed', yesterday, yesterday, 'Replaced magnetron tube');
+
+  // Task for request 7 (In Progress)
+  insertMntTask.run(7, mntStaffIds[0], 'In Progress', today, null, 'Investigating loose wire');
+
+  // Insert maintenance history
+  const insertMntHistory = db.prepare(`
+    INSERT INTO MaintenanceHistory (RequestID, Status, Notes, UpdatedBy)
+    VALUES (?, ?, ?, ?)
+  `);
+
+  insertMntHistory.run(2, 'In Progress', 'Task assigned to electrician', 1);
+  insertMntHistory.run(5, 'Completed', 'Microwave repaired', 1);
+  insertMntHistory.run(7, 'In Progress', 'Task assigned to maintenance technician', 1);
+
+  console.log('Maintenance data seeded successfully');
 }

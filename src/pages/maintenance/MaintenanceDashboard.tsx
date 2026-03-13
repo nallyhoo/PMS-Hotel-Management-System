@@ -221,32 +221,32 @@ export default function MaintenanceDashboard() {
             <tbody className="divide-y divide-[#1a1a1a]/5">
               {recentRequests.length > 0 ? recentRequests.map((request: any) => (
                 <tr 
-                  key={request.RequestID || request.requestId} 
+                  key={request.requestId} 
                   className="hover:bg-[#f8f9fa] transition-colors cursor-pointer"
-                  onClick={() => navigate(`/maintenance/tasks/${request.RequestID || request.requestId}`)}
+                  onClick={() => navigate(`/maintenance/tasks/${request.requestId}`)}
                 >
                   <td className="px-6 py-4">
-                    <span className="text-sm font-medium">MNT-{request.RequestID || request.requestId}</span>
+                    <span className="text-sm font-medium">MNT-{request.requestId}</span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className="text-sm">Room {request.RoomNumber || request.roomNumber}</span>
+                    <span className="text-sm">Room {request.roomNumber}</span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className="text-sm text-[#1a1a1a]/60">{request.RequestType || request.requestType}</span>
+                    <span className="text-sm text-[#1a1a1a]/60">{request.requestType}</span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-widest ${getPriorityColor(request.Priority || request.priority)}`}>
-                      {formatPriority(request.Priority || request.priority)}
+                    <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-widest ${getPriorityColor(request.priority)}`}>
+                      {formatPriority(request.priority)}
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-widest ${getStatusColor(request.Status || request.status)}`}>
-                      {formatStatus(request.Status || request.status)}
+                    <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-widest ${getStatusColor(request.status)}`}>
+                      {formatStatus(request.status)}
                     </span>
                   </td>
                   <td className="px-6 py-4">
                     <span className="text-sm text-[#1a1a1a]/60">
-                      {request.AssignedToFirstName ? `${request.AssignedToFirstName} ${request.AssignedToLastName || ''}` : 'Unassigned'}
+                      {request.assignedToFirstName ? `${request.assignedToFirstName} ${request.assignedToLastName || ''}` : 'Unassigned'}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">

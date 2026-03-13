@@ -11,7 +11,7 @@ import {
   Play,
   DollarSign,
   History,
-  Save
+  UserPlus
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -71,14 +71,14 @@ export default function MaintenanceTaskDetailsPage() {
   const request = requestData;
   const tasks = requestData?.tasks || [];
   const history = requestData?.history || [];
-  const currentTask = tasks.find((t: any) => t.Status === 'In Progress' || t.Status === 'in progress');
+  const currentTask = tasks.find((t: any) => t.status === 'In Progress');
 
-  const formatStatus = (status: string) => status || 'Pending';
+  const formatStatus = (status: string) => status || 'Open';
   const formatPriority = (priority: string) => priority || 'Normal';
 
-  const isPending = formatStatus(request?.Status).toLowerCase() === 'pending';
-  const isInProgress = formatStatus(request?.Status).toLowerCase() === 'in progress';
-  const isCompleted = formatStatus(request?.Status).toLowerCase() === 'completed';
+  const isOpen = formatStatus(request?.status).toLowerCase() === 'open';
+  const isInProgress = formatStatus(request?.status).toLowerCase() === 'in progress';
+  const isCompleted = formatStatus(request?.status).toLowerCase() === 'completed';
 
   const handleStartWork = () => {
     if (!selectedStaffId) {
@@ -112,8 +112,8 @@ export default function MaintenanceTaskDetailsPage() {
 
   const getPriorityColor = (priority: string) => {
     const p = formatPriority(priority).toLowerCase();
-    if (p === 'urgent' || p === 'high') return 'bg-red-50 text-red-600 border-red-100';
-    if (p === 'medium') return 'bg-amber-50 text-amber-600 border-amber-100';
+    if (p === 'emergency' || p === 'high') return 'bg-red-50 text-red-600 border-red-100';
+    if (p === 'normal') return 'bg-amber-50 text-amber-600 border-amber-100';
     return 'bg-blue-50 text-blue-600 border-blue-100';
   };
 
@@ -161,22 +161,22 @@ export default function MaintenanceTaskDetailsPage() {
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-serif font-medium text-[#1a1a1a]">MNT-{requestId}</h1>
-              <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border ${getStatusColor(request?.Status)}`}>
-                {formatStatus(request?.Status)}
+              <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border ${getStatusColor(request?.status)}`}>
+                {formatStatus(request?.status)}
               </span>
-              <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border ${getPriorityColor(request?.Priority)}`}>
-                {formatPriority(request?.Priority)}
+              <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border ${getPriorityColor(request?.priority)}`}>
+                {formatPriority(request?.priority)}
               </span>
             </div>
             <p className="text-sm text-[#1a1a1a]/60 mt-1">
-              Room {request?.RoomNumber} • {request?.RequestType}
+              Room {request?.roomNumber} • {request?.requestType}
             </p>
           </div>
         </div>
 
         {/* Action Buttons */}
         <div className="flex items-center gap-3">
-          {isPending && (
+          {isOpen && (
             <button 
               onClick={handleStartWork}
               disabled={createTaskMutation.isPending}
@@ -204,7 +204,7 @@ export default function MaintenanceTaskDetailsPage() {
           <div className="bg-white p-6 rounded-2xl border border-[#1a1a1a]/5 shadow-sm">
             <h3 className="text-lg font-serif mb-4">Description</h3>
             <p className="text-sm text-[#1a1a1a]/60">
-              {request?.Description || 'No description provided'}
+              {request?.description || 'No description provided'}
             </p>
           </div>
 
@@ -215,19 +215,19 @@ export default function MaintenanceTaskDetailsPage() {
               <div>
                 <p className="text-[10px] uppercase tracking-widest font-bold text-[#1a1a1a]/40 mb-1">Estimated Cost</p>
                 <p className="text-xl font-serif">
-                  ${request?.EstimatedCost || request?.estimatedCost || '0.00'}
+                  ${request?.estimatedCost || 0}
                 </p>
               </div>
               <div>
                 <p className="text-[10px] uppercase tracking-widest font-bold text-[#1a1a1a]/40 mb-1">Actual Cost</p>
                 <p className="text-xl font-serif text-emerald-600">
-                  ${request?.ActualCost || request?.actualCost || '0.00'}
+                  ${request?.actualCost || 0}
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Timeline / History */}
+          {/* Activity History */}
           <div className="bg-white p-6 rounded-2xl border border-[#1a1a1a]/5 shadow-sm">
             <h3 className="text-lg font-serif mb-4">Activity History</h3>
             {history.length > 0 ? (
@@ -238,9 +238,9 @@ export default function MaintenanceTaskDetailsPage() {
                       <History size={14} className="text-[#1a1a1a]/40" />
                     </div>
                     <div className="flex-1">
-                      <p className="text-sm">{item.Notes}</p>
+                      <p className="text-sm">{item.notes || 'Status updated'}</p>
                       <p className="text-[10px] text-[#1a1a1a]/40 mt-1">
-                        {item.UpdateDate ? new Date(item.UpdateDate).toLocaleString() : ''}
+                        {item.status} • {item.updateDate ? new Date(item.updateDate).toLocaleString() : ''}
                       </p>
                     </div>
                   </div>
@@ -250,6 +250,36 @@ export default function MaintenanceTaskDetailsPage() {
               <p className="text-sm text-[#1a1a1a]/40">No activity yet</p>
             )}
           </div>
+
+          {/* Assigned Tasks */}
+          {tasks.length > 0 && (
+            <div className="bg-white p-6 rounded-2xl border border-[#1a1a1a]/5 shadow-sm">
+              <h3 className="text-lg font-serif mb-4">Maintenance Tasks</h3>
+              <div className="space-y-3">
+                {tasks.map((task: any) => (
+                  <div key={task.taskId} className="flex items-center justify-between p-4 bg-[#f8f9fa] rounded-xl">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-[#1a1a1a] text-white flex items-center justify-center text-sm">
+                        {task.assignedStaffName?.[0] || '?'}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">
+                          {task.assignedStaffName || 'Assigned Staff'}
+                        </p>
+                        <p className="text-xs text-[#1a1a1a]/40">
+                          {task.startDate ? `Started: ${new Date(task.startDate).toLocaleDateString()}` : ''}
+                          {task.completionDate ? ` • Completed: ${new Date(task.completionDate).toLocaleDateString()}` : ''}
+                        </p>
+                      </div>
+                    </div>
+                    <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${getStatusColor(task.status)}`}>
+                      {task.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Sidebar */}
@@ -260,31 +290,59 @@ export default function MaintenanceTaskDetailsPage() {
             
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-[#1a1a1a]/40 uppercase tracking-widest">Location</span>
-                <span className="text-sm font-medium">Room {request?.RoomNumber}</span>
+                <span className="text-xs text-[#1a1a1a]/40 uppercase tracking-widest flex items-center gap-1">
+                  <MapPin size={12} /> Location
+                </span>
+                <span className="text-sm font-medium">Room {request?.roomNumber}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-xs text-[#1a1a1a]/40 uppercase tracking-widest">Type</span>
-                <span className="text-sm">{request?.RequestType}</span>
+                <span className="text-xs text-[#1a1a1a]/40 uppercase tracking-widest flex items-center gap-1">
+                  <Wrench size={12} /> Type
+                </span>
+                <span className="text-sm">{request?.requestType}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-xs text-[#1a1a1a]/40 uppercase tracking-widest">Priority</span>
-                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${getPriorityColor(request?.Priority)}`}>
-                  {formatPriority(request?.Priority)}
+                <span className="text-xs text-[#1a1a1a]/40 uppercase tracking-widest flex items-center gap-1">
+                  <AlertCircle size={12} /> Priority
+                </span>
+                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${getPriorityColor(request?.priority)}`}>
+                  {formatPriority(request?.priority)}
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-xs text-[#1a1a1a]/40 uppercase tracking-widest">Reported</span>
+                <span className="text-xs text-[#1a1a1a]/40 uppercase tracking-widest flex items-center gap-1">
+                  <User size={12} /> Reported By
+                </span>
                 <span className="text-sm">
-                  {request?.ReportedDate ? new Date(request.ReportedDate).toLocaleDateString() : '-'}
+                  {request?.reportedByName || 'System'}
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-xs text-[#1a1a1a]/40 uppercase tracking-widest">Scheduled</span>
+                <span className="text-xs text-[#1a1a1a]/40 uppercase tracking-widest flex items-center gap-1">
+                  <Clock size={12} /> Reported
+                </span>
                 <span className="text-sm">
-                  {request?.ScheduledDate ? new Date(request.ScheduledDate).toLocaleDateString() : '-'}
+                  {request?.reportedDate ? new Date(request.reportedDate).toLocaleDateString() : '-'}
                 </span>
               </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-[#1a1a1a]/40 uppercase tracking-widest flex items-center gap-1">
+                  <Calendar size={12} /> Scheduled
+                </span>
+                <span className="text-sm">
+                  {request?.scheduledDate ? new Date(request.scheduledDate).toLocaleDateString() : '-'}
+                </span>
+              </div>
+              {request?.completedDate && (
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-[#1a1a1a]/40 uppercase tracking-widest flex items-center gap-1">
+                    <CheckCircle2 size={12} /> Completed
+                  </span>
+                  <span className="text-sm text-emerald-600">
+                    {new Date(request.completedDate).toLocaleDateString()}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -292,29 +350,29 @@ export default function MaintenanceTaskDetailsPage() {
           <div className="bg-white p-6 rounded-2xl border border-[#1a1a1a]/5 shadow-sm space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-serif">Assigned To</h3>
-              {isPending && (
+              {isOpen && (
                 <button 
                   onClick={() => setShowAssignModal(true)}
-                  className="text-xs text-indigo-600 hover:underline"
+                  className="text-xs text-indigo-600 hover:underline flex items-center gap-1"
                 >
-                  Assign
+                  <UserPlus size={12} /> Assign
                 </button>
               )}
             </div>
-            {currentTask?.AssignedStaffID ? (
+            {currentTask?.assignedStaffId ? (
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-[#1a1a1a] text-white flex items-center justify-center text-sm font-bold">
-                  {(currentTask as any).FirstName?.[0]}{(currentTask as any).LastName?.[0]}
+                  {currentTask.assignedStaffName?.[0] || '?'}
                 </div>
                 <div>
                   <p className="text-sm font-medium">
-                    {(currentTask as any).FirstName} {(currentTask as any).LastName}
+                    {currentTask.assignedStaffName || 'Staff Member'}
                   </p>
-                  <p className="text-[10px] text-[#1a1a1a]/40">Staff Member</p>
+                  <p className="text-[10px] text-[#1a1a1a]/40">Assigned</p>
                 </div>
               </div>
             ) : (
-              <p className="text-sm text-[#1a1a1a]/40">Not assigned</p>
+              <p className="text-sm text-[#1a1a1a]/40">Not assigned yet</p>
             )}
           </div>
 
@@ -346,35 +404,43 @@ export default function MaintenanceTaskDetailsPage() {
               </div>
             </div>
           )}
+
+          {/* Notes */}
+          {request?.notes && (
+            <div className="bg-white p-6 rounded-2xl border border-[#1a1a1a]/5 shadow-sm space-y-3">
+              <h3 className="text-lg font-serif">Notes</h3>
+              <p className="text-sm text-[#1a1a1a]/60">{request.notes}</p>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Assign Modal */}
       {showAssignModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-md space-y-4">
             <h3 className="text-lg font-serif">Assign Staff</h3>
             <p className="text-sm text-[#1a1a1a]/60">Select a staff member to assign this task.</p>
             
-            <div className="space-y-2">
+            <div className="space-y-2 max-h-[300px] overflow-y-auto">
               {(staffData || []).map((staff: any) => (
                 <button
-                  key={staff.EmployeeID || staff.employeeId}
-                  onClick={() => setSelectedStaffId(staff.EmployeeID || staff.employeeId)}
+                  key={staff.employeeId}
+                  onClick={() => setSelectedStaffId(staff.employeeId)}
                   className={`w-full p-4 rounded-xl border text-left transition-all ${
-                    selectedStaffId === (staff.EmployeeID || staff.employeeId)
+                    selectedStaffId === staff.employeeId
                       ? 'border-[#1a1a1a] bg-[#f8f9fa]'
                       : 'border-[#1a1a1a]/10 hover:border-[#1a1a1a]/30'
                   }`}
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-[#1a1a1a] text-white flex items-center justify-center text-sm font-bold">
-                      {(staff.FirstName || staff.firstName)?.[0]}{(staff.LastName || staff.lastName)?.[0]}
+                      {staff.firstName?.[0]}{staff.lastName?.[0]}
                     </div>
                     <div>
-                      <p className="text-sm font-medium">{staff.FirstName || staff.firstName} {staff.LastName || staff.lastName}</p>
+                      <p className="text-sm font-medium">{staff.firstName} {staff.lastName}</p>
                       <p className="text-[10px] text-[#1a1a1a]/40">
-                        {staff.activeTasks || 0} active tasks
+                        {staff.position} ({staff.departmentName}) • {staff.activeTasks || 0} active
                       </p>
                     </div>
                   </div>
