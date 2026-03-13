@@ -538,6 +538,19 @@ CREATE TABLE CleaningLogs (
     FOREIGN KEY (StaffID) REFERENCES Employees(EmployeeID)
 );
 
+CREATE TABLE CleaningPhotos (
+    PhotoID INTEGER PRIMARY KEY AUTOINCREMENT,
+    TaskID INTEGER,
+    RoomID INTEGER NOT NULL,
+    PhotoURL TEXT NOT NULL,
+    PhotoType TEXT CHECK(PhotoType IN ('before', 'after', 'issue', 'other')),
+    Notes TEXT,
+    UploadedBy INTEGER,
+    CreatedDate DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (TaskID) REFERENCES HousekeepingTasks(TaskID),
+    FOREIGN KEY (RoomID) REFERENCES Rooms(RoomID)
+);
+
 -- ============================================================
 -- 9. MAINTENANCE
 -- ============================================================
@@ -1265,3 +1278,54 @@ SELECT
 FROM Payments p
 WHERE p.Status = 'Completed'
 GROUP BY DATE(p.PaymentDate);
+
+-- ============================================================
+-- SETTINGS
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS Settings (
+    SettingID INTEGER PRIMARY KEY AUTOINCREMENT,
+    Key TEXT NOT NULL UNIQUE,
+    Value TEXT,
+    Description TEXT,
+    Category TEXT,
+    UpdatedDate DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Default settings for Housekeeping Automation
+INSERT OR IGNORE INTO Settings (Key, Value, Description, Category) VALUES
+('auto_cleanup_enabled', 'true', 'Automatically create housekeeping task after guest checkout', 'housekeeping'),
+('auto_cleanup_delay', '30', 'Delay in minutes before housekeeping task is scheduled after checkout', 'housekeeping'),
+('auto_cleanup_priority', 'High', 'Priority for auto-created housekeeping tasks', 'housekeeping'),
+('auto_cleanup_task_type', 'Turnover', 'Task type for auto-created housekeeping tasks', 'housekeeping');
+
+-- ============================================================
+-- HOUSEKEEPING INVENTORY
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS HousekeepingSupplies (
+    SupplyID INTEGER PRIMARY KEY AUTOINCREMENT,
+    ItemName TEXT NOT NULL,
+    ItemCode TEXT UNIQUE,
+    Category TEXT,
+    Unit TEXT,
+    MinStockLevel INTEGER DEFAULT 10,
+    CurrentStock INTEGER DEFAULT 0,
+    CostPerUnit DECIMAL(10,2) DEFAULT 0,
+    Supplier TEXT,
+    IsActive INTEGER DEFAULT 1,
+    CreatedDate DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UpdatedDate DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS CleaningSupplyUsage (
+    UsageID INTEGER PRIMARY KEY AUTOINCREMENT,
+    TaskID INTEGER,
+    SupplyID INTEGER NOT NULL,
+    QuantityUsed INTEGER NOT NULL,
+    UsedBy INTEGER,
+    Notes TEXT,
+    UsageDate DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (TaskID) REFERENCES HousekeepingTasks(TaskID),
+    FOREIGN KEY (SupplyID) REFERENCES HousekeepingSupplies(SupplyID)
+);
