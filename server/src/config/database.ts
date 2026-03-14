@@ -374,4 +374,96 @@ export function seedDatabase() {
   insertMntHistory.run(7, 'In Progress', 'Task assigned to maintenance technician', 1);
 
   console.log('Maintenance data seeded successfully');
+
+  // Seed Invoices and Payments
+  const invoiceCheck = db.prepare('SELECT COUNT(*) as count FROM Invoices').get() as any;
+  if (invoiceCheck?.count === 0) {
+    // Get some reservations
+    const reservations = db.prepare('SELECT ReservationID, GuestID FROM Reservations LIMIT 5').all() as any[];
+    
+    // Calculate dates
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    const yesterdayDate = new Date(today);
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+    const yesterday = yesterdayDate.toISOString().split('T')[0];
+    const todayPlus3Date = new Date(today);
+    todayPlus3Date.setDate(todayPlus3Date.getDate() + 3);
+    const todayPlus3 = todayPlus3Date.toISOString().split('T')[0];
+    const todayMinus3Date = new Date(today);
+    todayMinus3Date.setDate(todayMinus3Date.getDate() - 3);
+    const todayMinus3 = todayMinus3Date.toISOString().split('T')[0];
+    const todayMinus1Date = new Date(today);
+    todayMinus1Date.setDate(todayMinus1Date.getDate() - 1);
+    const todayMinus1 = todayMinus1Date.toISOString().split('T')[0];
+    const todayMinus5Date = new Date(today);
+    todayMinus5Date.setDate(todayMinus5Date.getDate() - 5);
+    const todayMinus5 = todayMinus5Date.toISOString().split('T')[0];
+    const todayMinus10Date = new Date(today);
+    todayMinus10Date.setDate(todayMinus10Date.getDate() - 10);
+    const todayMinus10 = todayMinus10Date.toISOString().split('T')[0];
+    
+    if (reservations.length > 0) {
+      const invoices = [
+        [reservations[0]?.ReservationID, 'INV-2024-001', yesterday, yesterday, 850.00, 85.00, 0, 935.00, 'Paid', 935.00, 0],
+        [reservations[1]?.ReservationID, 'INV-2024-002', yesterday, todayPlus3, 1250.00, 125.00, 0, 1375.00, 'Pending', 0, 1375.00],
+        [reservations[0]?.ReservationID, 'INV-2024-003', todayMinus5, todayMinus1, 450.00, 45.00, 50, 445.00, 'Paid', 445.00, 0],
+        [reservations[2]?.ReservationID, 'INV-2024-004', todayMinus10, todayMinus5, 2100.00, 210.00, 0, 2310.00, 'Pending', 0, 2310.00],
+        [reservations[1]?.ReservationID, 'INV-2024-005', todayMinus3, today, 3200.00, 320.00, 0, 3520.00, 'Partial', 1000.00, 2520.00],
+      ];
+
+      const insertInvoice = db.prepare(`
+        INSERT INTO Invoices (ReservationID, InvoiceNumber, InvoiceDate, DueDate, SubTotal, TaxAmount, DiscountAmount, TotalAmount, Status, AmountPaid, BalanceDue)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      const invoiceIds: number[] = [];
+      for (const inv of invoices) {
+        insertInvoice.run(inv[0], inv[1], inv[2], inv[3], inv[4], inv[5], inv[6], inv[7], inv[8], inv[9], inv[10]);
+        const lastId = db.prepare('SELECT last_insert_rowid() as id').get() as any;
+        invoiceIds.push(lastId.id);
+      }
+
+      // Insert invoice items
+      const invoiceItems = [
+        [invoiceIds[0], 'Room', 'Deluxe Room - 2 nights', 2, 350.00, 700.00, 10],
+        [invoiceIds[0], 'Service', 'Room Service', 1, 150.00, 150.00, 10],
+        [invoiceIds[1], 'Room', 'Suite - 3 nights', 3, 350.00, 1050.00, 10],
+        [invoiceIds[1], 'Service', 'Spa Treatment', 1, 200.00, 200.00, 10],
+        [invoiceIds[2], 'Room', 'Standard Room - 1 night', 1, 300.00, 300.00, 10],
+        [invoiceIds[2], 'Service', 'Mini Bar', 1, 150.00, 150.00, 10],
+        [invoiceIds[3], 'Room', 'Suite - 4 nights', 4, 450.00, 1800.00, 10],
+        [invoiceIds[3], 'Service', 'Restaurant Bill', 1, 300.00, 300.00, 10],
+        [invoiceIds[4], 'Room', 'Presidential Suite - 2 nights', 2, 1400.00, 2800.00, 10],
+        [invoiceIds[4], 'Service', 'Airport Transfer', 1, 200.00, 200.00, 10],
+      ];
+
+      const insertItem = db.prepare(`
+        INSERT INTO InvoiceItems (InvoiceID, ItemType, Description, Quantity, UnitPrice, Amount, TaxRate)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      for (const item of invoiceItems) {
+        insertItem.run(item[0], item[1], item[2], item[3], item[4], item[5], item[6]);
+      }
+
+      // Insert payments
+      const payments = [
+        [invoiceIds[0], reservations[0]?.ReservationID, 'Credit Card', 935.00, 'USD', 'TXN-001', 'Completed', yesterday],
+        [invoiceIds[2], reservations[0]?.ReservationID, 'Cash', 445.00, 'USD', 'TXN-002', 'Completed', todayMinus3],
+        [invoiceIds[4], reservations[1]?.ReservationID, 'Credit Card', 1000.00, 'USD', 'TXN-003', 'Completed', todayMinus1],
+      ];
+
+      const insertPayment = db.prepare(`
+        INSERT INTO Payments (InvoiceID, ReservationID, PaymentMethod, Amount, Currency, ReferenceNumber, Status, PaymentDate)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      for (const p of payments) {
+        insertPayment.run(p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7]);
+      }
+
+      console.log('Invoices and Payments seeded successfully');
+    }
+  }
 }
