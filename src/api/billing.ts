@@ -6,6 +6,8 @@ export interface GetInvoicesParams {
   reservationId?: number;
   page?: number;
   limit?: number;
+  startDate?: string;
+  endDate?: string;
 }
 
 export interface CreateInvoiceRequest {
@@ -57,6 +59,8 @@ class BillingService {
     if (params?.reservationId) queryParams.append('reservationId', String(params.reservationId));
     if (params?.page) queryParams.append('page', String(params.page));
     if (params?.limit) queryParams.append('limit', String(params.limit));
+    if (params?.startDate) queryParams.append('startDate', params.startDate);
+    if (params?.endDate) queryParams.append('endDate', params.endDate);
     
     return api.get<PaginatedResponse<Invoice>>(`/invoices?${queryParams}`);
   }
@@ -92,6 +96,8 @@ class BillingService {
     if (params?.status) queryParams.append('status', params.status);
     if (params?.page) queryParams.append('page', String(params.page));
     if (params?.limit) queryParams.append('limit', String(params.limit));
+    if (params?.startDate) queryParams.append('startDate', params.startDate);
+    if (params?.endDate) queryParams.append('endDate', params.endDate);
     
     return api.get<PaginatedResponse<Payment>>(`/payments?${queryParams}`);
   }
@@ -122,6 +128,58 @@ class BillingService {
     if (endDate) queryParams.append('endDate', endDate);
     return api.get<Payment[]>(`/payments/history?${queryParams}`);
   }
+
+  async getRefunds(params?: { status?: string; page?: number; limit?: number }): Promise<PaginatedResponse<any>> {
+    const queryParams = new URLSearchParams();
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.page) queryParams.append('page', String(params.page));
+    if (params?.limit) queryParams.append('limit', String(params.limit));
+    return api.get<PaginatedResponse<any>>(`/payments/refunds?${queryParams}`);
+  }
+
+  async getRefund(id: number): Promise<any> {
+    return api.get<any>(`/payments/refunds/${id}`);
+  }
+
+  async approveRefund(id: number, data: { approvedBy?: number; notes?: string }): Promise<void> {
+    return api.put<void>(`/payments/refunds/${id}/approve`, data);
+  }
+
+  async rejectRefund(id: number, data: { rejectedBy?: number; reason: string }): Promise<void> {
+    return api.put<void>(`/payments/refunds/${id}/reject`, data);
+  }
+
+  async processRefundPayment(id: number, data: { processedBy?: number; refundMethod?: string; notes?: string }): Promise<void> {
+    return api.put<void>(`/payments/refunds/${id}/process`, data);
+  }
+
+  async getPaymentGateways(): Promise<any[]> {
+    return api.get<any[]>('/payment-gateway/gateways');
+  }
+
+  async createPaymentGateway(data: any): Promise<{ gatewayId: number }> {
+    return api.post<{ gatewayId: number }>('/payment-gateway/gateways', data);
+  }
+
+  async updatePaymentGateway(id: number, data: any): Promise<void> {
+    return api.put<void>(`/payment-gateway/gateways/${id}`, data);
+  }
+
+  async processCardPayment(data: { invoiceId?: number; amount: number; currency?: string; cardNumber: string; cardExpiry: string; cardCvv: string; gatewayId?: number }): Promise<any> {
+    return api.post<any>('/payment-gateway/process-card', data);
+  }
+
+  async processPayPalPayment(data: { invoiceId?: number; amount: number; currency?: string; paypalEmail: string }): Promise<any> {
+    return api.post<any>('/payment-gateway/process-paypal', data);
+  }
+
+  async processBankTransfer(data: { invoiceId?: number; amount: number; currency?: string; bankName: string; referenceNumber?: string }): Promise<any> {
+    return api.post<any>('/payment-gateway/process-bank-transfer', data);
+  }
+
+  async compareWithReservations(): Promise<any> {
+    return api.get<any>('/invoices/compare/reservations');
+  }
 }
 
 export interface GetPaymentsParams {
@@ -130,6 +188,8 @@ export interface GetPaymentsParams {
   status?: string;
   page?: number;
   limit?: number;
+  startDate?: string;
+  endDate?: string;
 }
 
 export interface PaginatedResponse<T> {

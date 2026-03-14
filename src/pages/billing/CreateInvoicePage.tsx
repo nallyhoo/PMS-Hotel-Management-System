@@ -9,20 +9,56 @@ import {
   CreditCard, 
   Search,
   CheckCircle2,
-  X
+  X,
+  Loader2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import billingService from '../../api/billing';
+import reservationService from '../../api/reservations';
+import { toastSuccess, toastError } from '../../lib/toast';
 
 export default function CreateInvoicePage() {
   const navigate = useNavigate();
   const [items, setItems] = useState([
-    { id: 1, description: '', quantity: 1, rate: 0, amount: 0 }
+    { id: 1, description: '', quantity: 1, rate: 0, amount: 0, itemType: 'Service' }
   ]);
-  const [isSaved, setIsSaved] = useState(false);
+  const [selectedReservation, setSelectedReservation] = useState<any>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [dueDate, setDueDate] = useState('');
+  const [notes, setNotes] = useState('');
+  const [taxRate] = useState(10);
+
+  // Fetch active reservations
+  const { data: reservationsData, isLoading } = useQuery({
+    queryKey: ['reservations', 'active'],
+    queryFn: () => reservationService.getReservations({ status: 'Checked In', limit: 50 }),
+  });
+
+  const reservations = reservationsData?.data || [];
+  const filteredReservations = reservations.filter((r: any) => 
+    !searchTerm || 
+    r.reservationCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    r.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    r.lastName?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Create invoice mutation
+  const createMutation = useMutation({
+    mutationFn: (data: any) => billingService.createInvoice(data),
+    onSuccess: (data) => {
+      toastSuccess(`Invoice ${data.invoiceNumber} created successfully!`);
+      navigate('/billing/invoices');
+    },
+    onError: (error: any) => {
+      toastError(error.message || 'Failed to create invoice');
+    },
+  });
 
   const addItem = () => {
-    setItems([...items, { id: Date.now(), description: '', quantity: 1, rate: 0, amount: 0 }]);
+    setItems([...items, { id: Date.now(), description: '', quantity: 1, rate: 0, amount: 0, itemType: 'Service' }]);
   };
 
   const removeItem = (id: number) => {
@@ -45,16 +81,48 @@ export default function CreateInvoicePage() {
   };
 
   const subtotal = items.reduce((sum, item) => sum + item.amount, 0);
-  const tax = subtotal * 0.1;
+  const tax = subtotal * (taxRate / 100);
   const total = subtotal + tax;
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSaved(true);
-    setTimeout(() => {
-      setIsSaved(false);
-      navigate('/billing/invoices');
-    }, 2000);
+    
+    if (!selectedReservation) {
+      toastError('Please select a guest/reservation');
+      return;
+    }
+
+    if (items.length === 0 || items.every(item => !item.description)) {
+      toastError('Please add at least one item');
+      return;
+    }
+
+    const invoiceItems = items
+      .filter(item => item.description)
+      .map(item => ({
+        itemType: item.itemType,
+        description: item.description,
+        quantity: item.quantity,
+        unitPrice: item.rate,
+        amount: item.amount,
+        taxRate: taxRate
+      }));
+
+    createMutation.mutate({
+      reservationId: selectedReservation.reservationId,
+      invoiceDate: new Date().toISOString().split('T')[0],
+      dueDate: dueDate || null,
+      subTotal: subtotal,
+      taxAmount: tax,
+      discountAmount: 0,
+      totalAmount: total,
+      notes: notes || null,
+      items: invoiceItems
+    });
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount || 0);
   };
 
   return (
@@ -81,27 +149,14 @@ export default function CreateInvoicePage() {
           </button>
           <button 
             onClick={handleSave}
-            className="flex items-center gap-2 px-6 py-2 bg-[#1a1a1a] text-white rounded-xl text-sm font-medium hover:bg-[#1a1a1a]/90 transition-all shadow-sm"
+            disabled={createMutation.isPending}
+            className="flex items-center gap-2 px-6 py-2 bg-[#1a1a1a] text-white rounded-xl text-sm font-medium hover:bg-[#1a1a1a]/90 transition-all shadow-sm disabled:opacity-50"
           >
-            <Save size={16} />
-            Save Invoice
+            {createMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+            {createMutation.isPending ? 'Saving...' : 'Save Invoice'}
           </button>
         </div>
       </div>
-
-      <AnimatePresence>
-        {isSaved && (
-          <motion.div 
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="bg-emerald-50 border border-emerald-100 p-4 rounded-xl flex items-center gap-3 text-emerald-800"
-          >
-            <CheckCircle2 size={20} className="text-emerald-600" />
-            <p className="text-sm font-medium">Invoice created successfully!</p>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       <form className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
@@ -117,10 +172,43 @@ export default function CreateInvoicePage() {
                   <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#1a1a1a]/30" />
                   <input 
                     type="text" 
-                    placeholder="Search guest name or room..."
+                    placeholder="Search guest or reservation..."
                     className="w-full pl-11 pr-4 py-3 bg-[#f8f9fa] border-none rounded-xl focus:ring-2 focus:ring-[#1a1a1a]/5 transition-all outline-none text-sm"
+                    value={searchTerm}
+                    onChange={(e) => { setSearchTerm(e.target.value); setShowDropdown(true); }}
+                    onFocus={() => setShowDropdown(true)}
                   />
+                  {showDropdown && filteredReservations.length > 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-[#1a1a1a]/10 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                      {filteredReservations.slice(0, 5).map((r: any) => (
+                        <button
+                          key={r.reservationId}
+                          type="button"
+                          className="w-full text-left px-4 py-3 hover:bg-[#f8f9fa] transition-colors border-b border-[#1a1a1a]/5 last:border-0"
+                          onClick={() => {
+                            setSelectedReservation(r);
+                            setSearchTerm(`${r.firstName} ${r.lastName} - ${r.reservationCode}`);
+                            setShowDropdown(false);
+                          }}
+                        >
+                          <p className="text-sm font-medium">{r.firstName} {r.lastName}</p>
+                          <p className="text-xs text-[#1a1a1a]/40">{r.reservationCode}</p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
+                {selectedReservation && (
+                  <div className="mt-2 p-3 bg-blue-50 rounded-xl flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">{selectedReservation.firstName} {selectedReservation.lastName}</p>
+                      <p className="text-xs text-blue-600">{selectedReservation.reservationCode}</p>
+                    </div>
+                    <button type="button" onClick={() => { setSelectedReservation(null); setSearchTerm(''); }} className="text-blue-400 hover:text-blue-600">
+                      <X size={16} />
+                    </button>
+                  </div>
+                )}
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] uppercase tracking-widest font-semibold text-[#1a1a1a]/40 flex items-center gap-2">
@@ -130,6 +218,8 @@ export default function CreateInvoicePage() {
                 <input 
                   type="date" 
                   className="w-full px-4 py-3 bg-[#f8f9fa] border-none rounded-xl focus:ring-2 focus:ring-[#1a1a1a]/5 transition-all outline-none text-sm"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
                 />
               </div>
             </div>
@@ -142,12 +232,25 @@ export default function CreateInvoicePage() {
               <div className="space-y-4">
                 {items.map((item, index) => (
                   <div key={item.id} className="grid grid-cols-12 gap-4 items-end">
-                    <div className="col-span-6 space-y-2">
+                    <div className="col-span-2 space-y-2">
+                      {index === 0 && <label className="text-[10px] text-[#1a1a1a]/40 uppercase tracking-widest font-semibold block">Type</label>}
+                      <select 
+                        className="w-full px-3 py-3 bg-[#f8f9fa] border-none rounded-xl text-sm focus:ring-2 focus:ring-[#1a1a1a]/5"
+                        value={item.itemType}
+                        onChange={(e) => updateItem(item.id, 'itemType', e.target.value)}
+                      >
+                        <option value="Room">Room</option>
+                        <option value="Service">Service</option>
+                        <option value="Food">Food</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+                    <div className="col-span-5 space-y-2">
                       {index === 0 && <label className="text-[10px] text-[#1a1a1a]/40 uppercase tracking-widest font-semibold">Description</label>}
                       <input 
                         type="text" 
                         placeholder="Item description..."
-                        className="w-full px-4 py-3 bg-[#f8f9fa] border-none rounded-xl focus:ring-2 focus:ring-[#1a1a1a]/5 transition-all outline-none text-sm"
+                        className="w-full px-4 py-3 bg-[#f8f9fa] border-none rounded-xl text-sm"
                         value={item.description}
                         onChange={(e) => updateItem(item.id, 'description', e.target.value)}
                       />
@@ -156,31 +259,33 @@ export default function CreateInvoicePage() {
                       {index === 0 && <label className="text-[10px] text-[#1a1a1a]/40 uppercase tracking-widest font-semibold text-center block">Qty</label>}
                       <input 
                         type="number" 
-                        className="w-full px-4 py-3 bg-[#f8f9fa] border-none rounded-xl focus:ring-2 focus:ring-[#1a1a1a]/5 transition-all outline-none text-sm text-center"
+                        className="w-full px-4 py-3 bg-[#f8f9fa] border-none rounded-xl text-sm text-center"
                         value={item.quantity}
                         onChange={(e) => updateItem(item.id, 'quantity', parseInt(e.target.value) || 0)}
                       />
                     </div>
                     <div className="col-span-2 space-y-2">
-                      {index === 0 && <label className="text-[10px] text-[#1a1a1a]/40 uppercase tracking-widest font-semibold text-right block">Rate</label>}
+                      {index === 0 && <label className="text-[10px] text-[#1a1a1a]/40 uppercase tracking-widest font-semibold text-right block">Amount</label>}
                       <input 
                         type="number" 
-                        className="w-full px-4 py-3 bg-[#f8f9fa] border-none rounded-xl focus:ring-2 focus:ring-[#1a1a1a]/5 transition-all outline-none text-sm text-right"
+                        className="w-full px-4 py-3 bg-[#f8f9fa] border-none rounded-xl text-sm text-right"
                         value={item.rate}
                         onChange={(e) => updateItem(item.id, 'rate', parseFloat(e.target.value) || 0)}
                       />
                     </div>
-                    <div className="col-span-2 flex items-center gap-2">
-                      <div className="flex-1 text-right text-sm font-medium py-3">
+                    <div className="col-span-1 flex items-center justify-end">
+                      <div className="text-sm font-medium py-3 w-full text-right">
                         ${item.amount.toFixed(2)}
                       </div>
-                      <button 
-                        type="button"
-                        onClick={() => removeItem(item.id)}
-                        className="p-3 text-red-400 hover:text-red-600 transition-colors"
-                      >
-                        <Trash2 size={18} />
-                      </button>
+                      {items.length > 1 && (
+                        <button 
+                          type="button"
+                          onClick={() => removeItem(item.id)}
+                          className="p-3 text-red-400 hover:text-red-600 transition-colors"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -207,7 +312,7 @@ export default function CreateInvoicePage() {
                 <span className="font-medium">${subtotal.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-[#1a1a1a]/40">Tax (10%)</span>
+                <span className="text-[#1a1a1a]/40">Tax ({taxRate}%)</span>
                 <span className="font-medium">${tax.toFixed(2)}</span>
               </div>
               <div className="flex justify-between pt-3 border-t border-[#1a1a1a]/5">
@@ -222,7 +327,9 @@ export default function CreateInvoicePage() {
             <textarea 
               rows={4}
               placeholder="Add any special notes or terms here..."
-              className="w-full px-4 py-3 bg-[#f8f9fa] border-none rounded-xl focus:ring-2 focus:ring-[#1a1a1a]/5 transition-all outline-none text-sm resize-none"
+              className="w-full px-4 py-3 bg-[#f8f9fa] border-none rounded-xl text-sm resize-none"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
             />
           </div>
         </div>

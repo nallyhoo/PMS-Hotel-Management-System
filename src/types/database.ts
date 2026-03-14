@@ -388,6 +388,14 @@ export interface Refund {
 
 export type RefundStatus = 'Pending' | 'Approved' | 'Rejected' | 'Processed';
 
+export interface RefundWithPayment extends Refund {
+  paymentMethod: string;
+  paymentAmount: number;
+  currency: string;
+  invoiceNumber: string;
+  transactionId: string;
+}
+
 // ============================================================
 // 7. SERVICES & POS
 // ============================================================

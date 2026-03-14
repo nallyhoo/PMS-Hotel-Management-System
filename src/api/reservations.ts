@@ -136,6 +136,10 @@ class ReservationService {
   async getRoomTypes(): Promise<any[]> {
     return api.get<any[]>('/rooms/types/list');
   }
+
+  async getBillingPreview(id: number): Promise<any> {
+    return api.get<any>(`/reservations/${id}/billing-preview`);
+  }
 }
 
 export const reservationService = new ReservationService();

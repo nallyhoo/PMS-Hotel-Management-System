@@ -44,6 +44,7 @@ import notificationRoutes from './routes/notifications.js';
 import keyCardRoutes from './routes/keycards.js';
 import guestNotesRoutes from './routes/guestNotes.js';
 import guestLoyaltyRoutes from './routes/guestLoyalty.js';
+import paymentGatewayRoutes from './routes/paymentGateways.js';
 
 app.use('/api/auth', authRoutes);
 app.use('/api/hotels', hotelRoutes);
@@ -68,6 +69,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/keycards', keyCardRoutes);
 app.use('/api/guests', guestNotesRoutes);
 app.use('/api/guests', guestLoyaltyRoutes);
+app.use('/api/payment-gateway', paymentGatewayRoutes);
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {

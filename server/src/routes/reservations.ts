@@ -332,16 +332,63 @@ router.post('/:id/checkin', (req: Request, res: Response) => {
 // Check-out guest
 router.post('/:id/checkout', (req: Request, res: Response) => {
   try {
-    const { totalBill, paymentStatus, roomInspected, inspectionNotes, notes, skipAutoClean } = req.body;
+    const { totalBill, paymentStatus, roomInspected, inspectionNotes, notes, skipAutoClean, generateInvoice } = req.body;
     const reservationId = req.params.id;
 
-    const reservation = db.prepare('SELECT AssignedRoomID, Status FROM Reservations WHERE ReservationID = ?').get(reservationId) as any;
+    // Default to auto-generate invoice if not specified
+    const shouldGenerateInvoice = generateInvoice !== false;
+
+    const reservation = db.prepare(`
+      SELECT r.*, rt.TypeName as RoomTypeName, rm.RoomNumber
+      FROM Reservations r
+      LEFT JOIN Rooms rm ON r.AssignedRoomID = rm.RoomID
+      LEFT JOIN RoomTypes rt ON rm.RoomTypeID = rt.RoomTypeID
+      WHERE r.ReservationID = ?
+    `).get(reservationId) as any;
     
     if (!reservation) {
       return res.status(404).json({ error: 'Reservation not found' });
     }
 
     let autoCleanCreated = false;
+    let invoiceId = null;
+    let invoiceNumber = null;
+
+    // Auto-generate invoice (default: true)
+    if (shouldGenerateInvoice) {
+      const existingInvoice = db.prepare('SELECT InvoiceID, InvoiceNumber FROM Invoices WHERE ReservationID = ?').get(reservationId) as any;
+      
+      if (existingInvoice) {
+        invoiceId = existingInvoice.InvoiceID;
+        invoiceNumber = existingInvoice.InvoiceNumber;
+      } else {
+        const today = new Date().toISOString().split('T')[0];
+        invoiceNumber = `INV-${Date.now()}`;
+        
+        const taxConfig = db.prepare('SELECT Value FROM Settings WHERE Key = ?').get('default_tax_rate') as any;
+        const taxRate = taxConfig ? parseFloat(taxConfig.Value) || 10 : 10;
+        
+        const subTotal = reservation.TotalAmount || 0;
+        const taxAmount = subTotal * (taxRate / 100);
+        const totalAmount = subTotal + taxAmount;
+
+        const invoiceResult = db.prepare(`
+          INSERT INTO Invoices (ReservationID, InvoiceNumber, InvoiceDate, DueDate, SubTotal, TaxAmount, DiscountAmount, TotalAmount, Status, AmountPaid, BalanceDue)
+          VALUES (?, ?, ?, ?, ?, ?, 0, ?, 'Pending', 0, ?)
+        `).run(reservationId, invoiceNumber, today, today, subTotal, taxAmount, totalAmount, totalAmount);
+
+        invoiceId = invoiceResult.lastInsertRowid;
+
+        const checkInDate = new Date(reservation.CheckInDate);
+        const checkOutDate = new Date(reservation.CheckOutDate);
+        const nights = Math.ceil((checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24)) || 1;
+
+        db.prepare(`
+          INSERT INTO InvoiceItems (InvoiceID, ItemType, Description, Quantity, UnitPrice, Amount, TaxRate)
+          VALUES (?, 'Room', ?, ?, ?, ?, ?)
+        `).run(invoiceId, `${reservation.RoomTypeName || 'Room'} (${reservation.RoomNumber || 'N/A'}) - ${nights} night${nights > 1 ? 's' : ''}`, nights, reservation.TotalAmount / nights, reservation.TotalAmount, taxRate);
+      }
+    }
 
     if (reservation.AssignedRoomID) {
       db.prepare(`
@@ -390,7 +437,7 @@ router.post('/:id/checkout', (req: Request, res: Response) => {
       VALUES (?, 'Checked Out', 'Checked Out', 'Guest checked out')
     `).run(reservationId);
 
-    res.json({ message: 'Check-out successful', autoCleanCreated });
+    res.json({ message: 'Check-out successful', autoCleanCreated, invoiceId, invoiceNumber });
   } catch (error) {
     console.error('Checkout error:', error);
     res.status(500).json({ error: 'Failed to check out' });
